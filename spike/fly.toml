@@ -1,0 +1,38 @@
+# Phase 0A spike: ESP Migration Agent deployed into the separate CUSTOMER
+# Fly org (cik-customer), from documented steps only. RC1-638.
+#
+#   fly apps create cik-esp --org cik-customer
+#   fly secrets set -a cik-esp ESP_REVIEW_PASSWORD=... ESP_REVIEW_SESSION_SECRET=...
+#   fly deploy -c <this file> -a cik-esp        # run from the esp-migration-agent checkout
+#
+# Differences from the vendor demo's fly.toml, on purpose:
+# - no custom domain (fly.dev hostname)
+# - no OIDC yet (identity mode is an ADR 0001 decision)
+# - no database yet (Neon customer project pending; app falls back to the
+#   file audit log per review_ui/config.py)
+# NOTE: no [build] section — a dockerfile path here resolves relative to this
+# config file, not the checkout. Pass --dockerfile Dockerfile on the deploy.
+app = "cik-esp"
+primary_region = "iad"
+
+[env]
+  ESP_ENVIRONMENT = "production"
+  ESP_PUBLIC_URL = "https://cik-esp.fly.dev"
+
+[http_service]
+  internal_port = 8080
+  force_https = true
+  auto_stop_machines = "suspend"
+  auto_start_machines = true
+  min_machines_running = 0
+
+  [[http_service.checks]]
+    interval = "30s"
+    timeout = "5s"
+    grace_period = "10s"
+    method = "GET"
+    path = "/healthz"
+
+[[vm]]
+  size = "shared-cpu-1x"
+  memory = "512mb"
