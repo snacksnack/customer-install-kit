@@ -13,7 +13,12 @@ For each fault family: how it is injected on the supported profile, what evidenc
 
 ## Dev family 2 — API host reachable, upload endpoint denied
 
-- **Status: pending.** Open question: the customer environment has no destination (Brevo) credential yet; feasibility needs either a customer-side Brevo account/key with a deniable route, or an egress-level denial of the specific endpoint. To be spiked next.
+- **Status: GO, evidence shape proven (2026-11-10); injection mechanics are dashboard-side.**
+- **Destination:** the existing Brevo account serves as the demo customer's ESP (reconciliation lineage from RC1-547). The customer environment gets its own API key (a second key in the account) when Phase 3 wires the conformance migration; not needed for 0B.
+- **Injection (matrix-time):** a **post-preflight state change**, explicitly permitted by RC1-646 — rotate/deactivate the API key or enable Brevo's authorized-IP restriction after install checks pass. Preflight was honestly green; the runtime then meets a denied endpoint.
+- **Evidence produced (captured live):** baseline `GET /v3/contacts` 200 with the valid key; then `POST /v3/contacts` → **HTTP 401**, body `code: "unauthorized"` — host reachable, TLS fine, route denied. Event contract carries HTTP status + route template (`POST /v3/contacts`) + the provider's error *code* (a closed enum, not message text).
+- **Feasibility shortcut, disclosed:** the 0B capture used an invalidated credential to produce the denied state; the matrix injection is the dashboard-side rotation/IP restriction, whose observable is the same status/route/code triple. If Phase 6 wants the IP-restriction variant specifically, prove it then.
+- **Distinctness note:** this family is *endpoint denial* (401/403 on the operation). Held-out H2 is *credential valid but under-scoped* — whether Brevo even supports scoped keys is itself an open feasibility question for the evaluator-side H-candidate spike; if Brevo cannot express it, H2 drops from the pool (pool stays ≥2 with H1/H3).
 
 ## Dev family 3 — storage writable at install, unavailable/full later
 
