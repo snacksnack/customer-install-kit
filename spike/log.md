@@ -23,7 +23,8 @@ Machine cost at the demo's shape (shared-cpu-1x, 512 MB, scale-to-zero) is the s
 
 **Honest limit:** the app boots healthy with the DB secrets present, but no write has yet gone through the app to Postgres — the review UI only writes on gate decisions/sessions. End-to-end proof of the durable path is Phase 3's (conformance) job, not claimed here.
 
-**Still pending:** GitHub repo creation (classifier-blocked; Reid runs `gh repo create` or adds a permission rule).
+10. GitHub repo created and branch pushed (by Reid; the classifier had blocked `gh repo create` for the agent): https://github.com/snacksnack/customer-install-kit
+11. **Denial test green (RC1-638 exit criterion).** Built `cik-triage-probe` (python:3.12-slim + psycopg, no mounts, no credentials) and ran `denial_test.py` inside it: env census clean; Fly Machines API 401; Neon API 401; customer Postgres **auth-refused** (`fe_sendauth: no password supplied`); filesystem `.env` census clean. 5 denied, 0 breaches. First run exposed a weak probe: Docker had no IPv6 egress, so the Postgres refusal was "network unreachable" — a denial that proves nothing about credentials. Fixed by pinning an IPv4 `hostaddr` so the refusal is authentication, with the reasoning kept in the script.
 
 ## Found so far, for ADR 0001
 
