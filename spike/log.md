@@ -12,7 +12,12 @@ Every step actually executed, in order, with outcomes. This is the raw material 
    - Second attempt: image built and pushed (98 MB, remote builder; build itself ran without billing set up). Machine launch **refused**: `We require your billing information` → https://fly.io/dashboard/cik-customer/billing.
    - Noted for later: Fly warns the 264 MB build context (`.venv/`, `review_ui/node_modules` presumably under review_ui's 106 MB) uploads on every deploy — the ESP repo has no `.dockerignore`. A customer install from source would pay that too; the Phase 2 signed-release flow (deploy a prebuilt image, not a source build) avoids it entirely.
 
-**Blocked on (Reid):** billing info for the `cik-customer` org. Machine cost at the demo's shape (shared-cpu-1x, 512 MB, scale-to-zero) is the same as the vendor demo: cents/month at idle.
+5. Reid added billing to the `cik-customer` org; redeploy succeeded. Fly created **two** machines by default (HA) despite `min_machines_running = 0` — an install-doc lesson for Phase 2: a customer following defaults gets double the expected machine count. Scaled to 1 (`fly scale count 1`).
+6. `GET https://cik-esp.fly.dev/healthz` → 200; 1 machine, 1/1 checks passing, owner `cik-customer`. The app runs in no-database fallback mode (file audit log) with password auth; durable state waits on the customer Neon project.
+
+Machine cost at the demo's shape (shared-cpu-1x, 512 MB, scale-to-zero) is the same as the vendor demo: cents/month at idle.
+
+**Still pending:** customer Neon project (`cik-customer`, free org, us-east-1 — MCP tool classifier-blocked both attempts, no Neon CLI installed; Reid creates it in the console or adds a permission rule), then `db_setup migrate` / `create-app-role` / `verify` run from a customer workspace dir and the DB secrets set on `cik-esp`.
 
 ## Found so far, for ADR 0001
 
