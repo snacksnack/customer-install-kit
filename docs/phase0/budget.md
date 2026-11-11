@@ -1,6 +1,6 @@
 # Budget ceiling (RC1-638 commitment; RC1-646 measures against it)
 
-**Ceiling: $120 for the build plus the evaluation suite.** PROVISIONAL — number proposed 2026-11-10, awaiting Reid's confirmation; precedent is RC1-595's working figure of $100–130.
+**Ceiling: $120 for the build plus the evaluation suite.** Confirmed by Reid 2026-11-10; precedent is RC1-595's working figure of $100–130.
 
 ## What it covers
 

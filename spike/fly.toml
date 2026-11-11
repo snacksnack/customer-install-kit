@@ -19,6 +19,13 @@ primary_region = "iad"
   ESP_ENVIRONMENT = "production"
   ESP_PUBLIC_URL = "https://cik-esp.fly.dev"
 
+# Storage for the fault-injection phases (RC1-646, dev family 3): writable at
+# install, made unavailable/full at runtime. 1 GB on purpose - small enough
+# to fill quickly in an injection run.
+[mounts]
+  source = "cik_data"
+  destination = "/data"
+
 [http_service]
   internal_port = 8080
   force_https = true

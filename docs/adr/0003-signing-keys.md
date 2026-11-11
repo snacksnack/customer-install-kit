@@ -1,6 +1,6 @@
 # ADR 0003: Ownership and trust of release signing and report keys
 
-Status: proposed (pending Reid's accept) · 2026-11-10 · RC1-638
+Status: accepted (Reid, 2026-11-10, PR #1) · RC1-638
 
 ## Decision
 
