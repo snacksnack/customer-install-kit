@@ -18,7 +18,7 @@ For each fault family: how it is injected on the supported profile, what evidenc
 - **Injection (matrix-time):** a **post-preflight state change**, explicitly permitted by RC1-646 — rotate/deactivate the API key or enable Brevo's authorized-IP restriction after install checks pass. Preflight was honestly green; the runtime then meets a denied endpoint.
 - **Evidence produced (captured live):** baseline `GET /v3/contacts` 200 with the valid key; then `POST /v3/contacts` → **HTTP 401**, body `code: "unauthorized"` — host reachable, TLS fine, route denied. Event contract carries HTTP status + route template (`POST /v3/contacts`) + the provider's error *code* (a closed enum, not message text).
 - **Feasibility shortcut, disclosed:** the 0B capture used an invalidated credential to produce the denied state; the matrix injection is the dashboard-side rotation/IP restriction, whose observable is the same status/route/code triple. If Phase 6 wants the IP-restriction variant specifically, prove it then.
-- **Distinctness note:** this family is *endpoint denial* (401/403 on the operation). Held-out H2 is *credential valid but under-scoped* — whether Brevo even supports scoped keys is itself an open feasibility question for the evaluator-side H-candidate spike; if Brevo cannot express it, H2 drops from the pool (pool stays ≥2 with H1/H3).
+- **Distinctness note:** this family is *endpoint denial* (401/403 on the operation). Held-out H2 is *credential valid but under-scoped* — a different fault with different evidence. H2's feasibility was settled by the evaluator-side spike (see the held-out section below); the pool holds all three candidates.
 
 ## Dev family 3 — storage writable at install, unavailable/full later
 
@@ -36,4 +36,4 @@ For each fault family: how it is injected on the supported profile, what evidenc
 
 ## Lifecycle cost measurements
 
-- **Status: pending.** One simple case (family 1 is the candidate: no redeploy, seconds to inject/restore) and one difficult case (family 3: volume operations, machine state) measured per stage — elapsed time, cloud usage, operator interventions. Model cost stays provisional until representative bundles exist (RC1-647), then estimated from real inference calls on them.
+- **Status: done (2026-11-10).** Simple case (family 1): 2.2 s full lifecycle, automated, ~$0 marginal cost. Difficult case (family 3): 64.6 s from a suspended machine, automated, fractions of a cent. Projected suite total ~$65–85 against the $120 ceiling. Per-stage tables, assumptions, and the projection live in `lifecycle-costs.md`; the go/resize/drop calls land in ADR 0004. Model cost stays provisional until representative bundles exist (RC1-647), re-measured at Phase 5.
