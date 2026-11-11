@@ -17,7 +17,13 @@ For each fault family: how it is injected on the supported profile, what evidenc
 
 ## Dev family 3 — storage writable at install, unavailable/full later
 
-- **Status: pending.** Needs the Fly volume added to the profile (ADR 0001 anticipates this). Fill via quota-sized writes; detach via `fly volumes` operations on the running machine. Error-sink survival test rides on this one: events must still be collectable (stdout/platform log stream is the candidate independent sink) after injection.
+- **Status: GO, fill variant (proven live, 2026-11-10).**
+- **Injection:** 1 GB Fly volume `cik_data` mounted at `/data` (now part of the profile; `spike/fly.toml`). Baseline write succeeds at install; `dd` fills to 100% (958 MiB in ~57 s at ~17.6 MB/s). Restore: delete the fill file; verified back to 1% used and writable.
+- **Passes preflight because:** the mount exists, is writable at install time, and — measured during the fault — **the app's health check stayed green at 100% full** (healthz 200, stateless app). Storage death is invisible to liveness.
+- **Evidence produced:** `errno 28` / `No space left on device` on the failing write, captured as a structured event (`storage_write_failed`, `op: collector.write`).
+- **Evidence-contract lesson (feeds RC1-647):** a small buffered write to a 100%-full filesystem *appears to succeed* — ENOSPC surfaces at flush/close, not at `write()`. Instrumentation that does not flush (or check close) will silently swallow exactly this fault. The event emitter must flush and treat close errors as write errors.
+- **Sink survival: PROVEN.** With `/data` at 100%, app stdout still reached the Fly platform log stream (healthz access lines logged during the fault). Stdout → platform logs is the independent sink; it shares nothing with the faulted volume.
+- **Variants for the matrix:** missing/misconfigured mount (deploy without `[mounts]` — mechanics known, not yet exercised); fill *during* a migration run rather than before it.
 
 ## Held-out candidates H1–H3
 
