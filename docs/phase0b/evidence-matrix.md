@@ -32,7 +32,7 @@ For each fault family: how it is injected on the supported profile, what evidenc
 
 ## Held-out candidates H1–H3
 
-- **Status: pending.** Feasibility proof only, evaluator-only storage, after the dev families are done.
+- **Status: all three FEASIBLE (2026-11-10).** Per the protocol, only the verdict lives here: injection mechanics, captured evidence, and one platform evidence-gap finding are stored under evaluator-only access (`cik-evaluator/`, outside this repo), so nothing learned from H families can leak into rules, prompts, or support knowledge. The pool stays at three candidates for the recorded-randomness draw.
 
 ## Lifecycle cost measurements
 
