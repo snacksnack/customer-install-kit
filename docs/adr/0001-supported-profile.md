@@ -1,6 +1,6 @@
 # ADR 0001: Supported deployment profile for v1
 
-Status: proposed (pending Reid's accept) · 2026-11-10 · RC1-638
+Status: accepted (Reid, 2026-11-10) · RC1-638
 
 ## Decision
 
