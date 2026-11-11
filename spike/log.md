@@ -17,7 +17,13 @@ Every step actually executed, in order, with outcomes. This is the raw material 
 
 Machine cost at the demo's shape (shared-cpu-1x, 512 MB, scale-to-zero) is the same as the vendor demo: cents/month at idle.
 
-**Still pending:** customer Neon project (`cik-customer`, free org, us-east-1 — MCP tool classifier-blocked both attempts, no Neon CLI installed; Reid creates it in the console or adds a permission rule), then `db_setup migrate` / `create-app-role` / `verify` run from a customer workspace dir and the DB secrets set on `cik-esp`.
+7. Customer Neon project created (by Reid, in the console — the MCP `create_project` call was classifier-blocked twice and no Neon CLI is installed): project `cik-customer` (`late-king-38036710`), free org, us-east-1, Postgres only; Neon's "set up with your coding agent" scaffold prompt deliberately skipped (ESP has its own `db_setup` flow, which is what the kit documents).
+8. From `spike/customer-ws/` (so `db_setup`'s CWD-relative env files cannot clobber the vendor demo's `.env.neon` in the ESP checkout): wrote `.env.neon.owner` with the **direct** (non-pooler) owner URL, then `PYTHONPATH=<esp checkout> uv run --project <esp checkout> --group ui python -m review_ui.db_setup migrate` → `schema applied`; `create-app-role` → `esp_app ready`, wrote `.env.neon`; `verify` → chain intact, UPDATE/DELETE/TRUNCATE all refused for the app role.
+9. `flyctl secrets import -a cik-esp < .env.neon` — rolling update succeeded, healthz 200, clean boot logs. Secret presence confirmed on the machine via `fly ssh console` (`durable-store-secrets-present`; values never printed).
+
+**Honest limit:** the app boots healthy with the DB secrets present, but no write has yet gone through the app to Postgres — the review UI only writes on gate decisions/sessions. End-to-end proof of the durable path is Phase 3's (conformance) job, not claimed here.
+
+**Still pending:** GitHub repo creation (classifier-blocked; Reid runs `gh repo create` or adds a permission rule).
 
 ## Found so far, for ADR 0001
 
