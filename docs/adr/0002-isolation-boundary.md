@@ -1,6 +1,6 @@
 # ADR 0002: Vendor/customer isolation boundary and the triage execution identity
 
-Status: proposed (pending Reid's accept) · 2026-11-10 · RC1-638
+Status: accepted (Reid, 2026-11-10, PR #1) · RC1-638
 
 ## The claim this ADR exists to make honest
 
