@@ -291,6 +291,20 @@ def test_install_never_migrates_a_newer_database_backward(world):
     assert not world["fly"].created("deploy")
 
 
+def test_a_refused_install_does_not_misreport_what_is_deployed(world):
+    world["build"]().install()
+    world["db"].marker = (2, 2)  # a newer release migrated, breaking
+    (world["dir"] / "install.toml").write_text(
+        (world["dir"] / "install.toml").read_text().replace("0.1.1", "0.1.2"))
+    world["releases"]["0.1.2"] = make_release("0.1.2", schema=(1, 1))
+    with pytest.raises(RecoveryRequired):
+        world["build"]().install()
+    r = read_record(world)
+    assert r["release"]["version"] == "0.1.1"          # still what runs
+    assert r["target_release"]["version"] == "0.1.2"
+    assert r["installed_version"] == "0.1.1"
+
+
 def test_runtime_check_failure_is_installed_not_ready(world):
     world["failing"] = ("ENV-001",)
     assert world["build"]().install() == 1
@@ -331,3 +345,36 @@ def test_an_app_in_another_org_is_never_adopted(world):
     with pytest.raises(InstallError, match="belongs to org someone-else"):
         world["build"]().install()
     assert not world["fly"].created("create_app")
+
+
+def test_deploy_waits_out_a_lagging_machines_api(world):
+    fly = world["fly"]
+    real_deploy, stale = fly.deploy, {"left": 0, "old": None}
+
+    def deploy(app, config, image):
+        stale["old"], stale["left"] = fly.machine_digest.get(app), 3
+        real_deploy(app, config, image)
+
+    real_machines = fly.machines
+
+    def machines(app):
+        if stale["left"] and stale["old"]:
+            stale["left"] -= 1
+            return [{"state": "stopped", "image_ref": {"digest": stale["old"]}}]
+        return real_machines(app)
+
+    fly.deploy, fly.machines = deploy, machines
+    world["build"]().install()
+    (world["dir"] / "install.toml").write_text(
+        (world["dir"] / "install.toml").read_text().replace("0.1.1", "0.1.2"))
+    assert world["build"]().install() == 0  # seen live: deploy done, list still old
+    assert fly.machine_digest["acme-esp"] == DIGESTS["0.1.2"]
+
+
+def test_history_counts_completed_installs_not_started_ones(world):
+    with pytest.raises(InjectedFailure):
+        world["build"]().install(fail_after="schema")
+    world["build"]().install()
+    r = read_record(world)
+    assert [(h["action"], h["from"], h["to"]) for h in r["history"]] == [("install", None, "0.1.1")]
+    assert r["installed_version"] == "0.1.1"

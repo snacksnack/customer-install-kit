@@ -11,6 +11,8 @@ import json
 import sys
 from pathlib import Path
 
+import psycopg
+
 from kit.install import config as cfg
 from kit.install import record as rec
 from kit.install import release as rel
@@ -105,6 +107,10 @@ def main(argv: list[str] | None = None) -> int:
         return EXIT_REFUSED
     except InjectedFailure as exc:
         print(f"stopped: {exc}; re-run install to resume", file=sys.stderr)
+        return EXIT_STEP_FAILED
+    except psycopg.Error as exc:
+        print(f"database step failed: {type(exc).__name__}: {str(exc).splitlines()[0]}\n"
+              "re-run to resume", file=sys.stderr)
         return EXIT_STEP_FAILED
     except (InstallError, FlyError, ImageError) as exc:
         print(f"install step failed: {exc}\nre-run install to resume", file=sys.stderr)

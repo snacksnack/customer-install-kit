@@ -34,6 +34,7 @@ from urllib.parse import urlsplit
 import psycopg
 from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
+from psycopg import sql
 
 from kit import preflight, registry
 from kit.install import record as rec
@@ -51,6 +52,8 @@ REPORT_KEY = "report-key.pem"
 PUSHED_DIGESTS = ".cik-pushed.sha256"
 HEALTH_ATTEMPTS = 30
 HEALTH_INTERVAL_S = 2.0
+DEPLOY_SETTLE_ATTEMPTS = 20
+DEPLOY_SETTLE_INTERVAL_S = 3.0
 
 STEPS = (
     "verify_release",
@@ -155,6 +158,33 @@ def _digest(value: str) -> str:
     return hashlib.sha256(value.encode()).hexdigest()
 
 
+APP_ROLE = "esp_app"
+
+
+def drop_role(owner_url: str, role: str) -> str:
+    """Drop the app role and its grants, never data. Since Postgres 16 the
+    role's creator holds ADMIN on it but is not a member, so DROP OWNED is
+    refused until the owner grants itself membership (seen live on Neon,
+    RC1-640). DROP OWNED would also drop anything the role owns, so a role
+    that owns any object is refused outright: the app role should own
+    nothing, and if it does, that is data the kit will not delete."""
+    ident = sql.Identifier(role)
+    with psycopg.connect(owner_url, autocommit=True) as conn:
+        if not conn.execute("SELECT 1 FROM pg_roles WHERE rolname = %s", (role,)).fetchone():
+            return "absent"
+        owned = conn.execute(
+            "SELECT count(*) FROM pg_class c JOIN pg_roles r ON r.oid = c.relowner"
+            " WHERE r.rolname = %s", (role,)).fetchone()[0]
+        if owned:
+            raise InstallError(f"{role} owns {owned} relation(s); refusing to drop it (that"
+                               " would drop data). Reassign them, then re-run teardown.")
+        with conn.transaction():
+            conn.execute(sql.SQL("GRANT {} TO CURRENT_USER").format(ident))
+            conn.execute(sql.SQL("DROP OWNED BY {}").format(ident))
+            conn.execute(sql.SQL("DROP ROLE {}").format(ident))
+    return "dropped"
+
+
 def _db_identity(url: str) -> dict[str, str]:
     """Where the database is, never how to log in to it."""
     parts = urlsplit(url)
@@ -219,7 +249,9 @@ class Installer:
         elif self.record["config"]["app"] != self.cfg.app:
             raise InstallError("install.toml names a different app than install-record.json")
         self.record["state"] = rec.STATE_INSTALLING
-        previous = (self.record.get("release") or {}).get("version")
+        # The last version an install or rollback COMPLETED, not the one a
+        # failed run started: `release` is written at verify time.
+        previous = self.record.get("installed_version")
         self._save()
         for name in STEPS:
             try:
@@ -242,12 +274,15 @@ class Installer:
                 "action": "install" if previous is None else "upgrade",
                 "from": previous, "to": self.release.version, "at": rec.now(),
             })
+        self.record["installed_version"] = self.release.version
         self._save()
         return 1 if failing else 0
 
     def _step_verify_release(self) -> None:
         self.release = self._verify(self.cfg.release)
-        self.record["release"] = self.release.to_json()
+        # `release` is what is DEPLOYED; it changes only once a deploy is
+        # confirmed, so a refused or half-done install never misreports it.
+        self.record["target_release"] = self.release.to_json()
         rec.step(self.record, "verify_release", "done", digest=self.release.image_digest)
         self._say(f"verified v{self.release.version} {self.release.image_ref}")
 
@@ -347,6 +382,8 @@ class Installer:
             action = "migrated"
         db = _db_identity(self._owner_url())
         db["schema"] = {"version": marker[0], "compatible_with": marker[1]}
+        known = self.record["resources"].get("database") or {}
+        db["migrated_at"] = rec.now() if action == "migrated" else known.get("migrated_at")
         db["ownership"] = rec.ADOPTED  # the customer brought it; the kit never deletes it
         self.record["resources"]["database"] = db
         rec.step(self.record, "schema", "done", action=action, version=marker[0])
@@ -409,14 +446,21 @@ class Installer:
             return "current"
         self._say(f"deploying {release.image_ref}")
         self.fly.deploy(self.cfg.app, str(config), release.image_ref)
-        running = self._running_digests()
-        if running != {release.image_digest}:
+        # The machines API lags a completed deploy by a few seconds (seen
+        # live, RC1-640): poll before calling it a mismatch.
+        for _ in range(DEPLOY_SETTLE_ATTEMPTS):
+            running = self._running_digests()
+            if running == {release.image_digest}:
+                break
+            self.deps.sleep(DEPLOY_SETTLE_INTERVAL_S)
+        else:
             raise InstallError(f"after deploy the machines run {sorted(running)},"
                                f" not {release.image_digest}")
         return "deployed"
 
     def _step_deploy(self) -> None:
         action = self._deploy(self.release)
+        self.record["release"] = self.release.to_json()
         rec.step(self.record, "deploy", "done", action=action,
                  config_sha256=_digest(self._fly_toml().read_text()))
 
@@ -471,7 +515,8 @@ class Installer:
             entry["outcome"] = "refused"
             self.record["history"].append(entry)
             self._save()
-            restore_from = self.record["steps"].get("schema", {}).get("at", "the migration")
+            restore_from = (self.record["resources"].get("database") or {}).get(
+                "migrated_at") or "the last migration"
             raise RecoveryRequired(
                 f"rollback to v{version} refused: the database reports {found}, and"
                 f" v{version}'s code supports schema v{target.schema_version}. An image"
@@ -486,6 +531,7 @@ class Installer:
         self._wait_healthy()
         entry["outcome"] = action
         self.record["history"].append(entry)
+        self.record["installed_version"] = version
         rec.step(self.record, "deploy", "done", action=action,
                  config_sha256=_digest(self._fly_toml().read_text()))
         self._save()
@@ -521,12 +567,8 @@ class Installer:
             actions["volume"] = ("destroyed" if vol_owned
                                  else "destroyed with the app" if app_owned else retained)
         if drop_app_role:
-            with psycopg.connect(self._owner_url(), autocommit=True) as conn:
-                if conn.execute("SELECT 1 FROM pg_roles WHERE rolname = 'esp_app'").fetchone():
-                    conn.execute("DROP OWNED BY esp_app")  # its grants; it owns no tables
-                    conn.execute("DROP ROLE esp_app")
+            actions["app_role"] = drop_role(self._owner_url(), APP_ROLE)
             self._set_secrets({"ESP_DATABASE_URL": ""})
-            actions["app_role"] = "dropped"
         actions["database"] = "retained (customer data is never deleted by the kit)"
         self.record["state"] = rec.STATE_TORN_DOWN
         self.record["history"].append({"action": "teardown", "at": rec.now(), **actions})

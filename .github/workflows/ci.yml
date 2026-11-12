@@ -8,6 +8,17 @@ on:
 jobs:
   checks:
     runs-on: ubuntu-latest
+    # A real Postgres so the teardown role-drop tests run as a non-superuser
+    # owner, the way the customer's database (Neon) runs it (RC1-640).
+    services:
+      postgres:
+        image: postgres:18
+        env:
+          POSTGRES_PASSWORD: ci-only
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd pg_isready --health-interval 5s
+          --health-timeout 5s --health-retries 10
     steps:
       - uses: actions/checkout@v4
       - uses: astral-sh/setup-uv@v4
@@ -15,4 +26,8 @@ jobs:
       - run: uv run ruff check .
       - run: uv run python -m kit registry
       - run: uv run python -m kit requirements --check
+      # tests/test_release_live.py verifies the committed v0.1.2 release
+      # against Sigstore's public trust root (network, like a real install).
       - run: uv run pytest
+        env:
+          CIK_TEST_PG_ADMIN_URL: postgresql://postgres:ci-only@localhost:5432/postgres

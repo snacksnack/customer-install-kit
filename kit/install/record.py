@@ -44,7 +44,9 @@ def new(install_id: str, profile: str, config: dict[str, Any]) -> dict[str, Any]
         "updated_at": stamp,
         "state": STATE_INSTALLING,
         "config": config,
-        "release": None,
+        "release": None,             # deployed now
+        "target_release": None,      # what the latest install run is installing
+        "installed_version": None,   # last install/rollback that COMPLETED
         "resources": {},
         "secrets": {"pushed": []},
         "report_key": None,
