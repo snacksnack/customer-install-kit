@@ -1,0 +1,232 @@
+# Customer Install Kit check registry (RC1-639, ADR 0005).
+#
+# The single source for every check the kit knows about. Preflight runs the
+# checks below; conformance, bundles and triage refer to the same IDs. The
+# customer requirements document (docs/requirements.md) is generated from
+# this file: edit here, then run `uv run python -m kit requirements`.
+#
+# Scope is Phase 0 dependencies only (docs/phase0/dependency-inventory.md,
+# ADR 0001). No check exists to give a fault family something to break (R7).
+#
+# Field contract (validated by kit/registry.py):
+#   id           stable, never reused: <AREA>-<NNN>
+#   context      where the probe must run: "operator" (the customer's
+#                workstation, holding install-time credentials) or "runtime"
+#                (a machine in the customer's Fly app, which receives the app's
+#                secrets as environment variables)
+#   severity     "required" gates installation; "advisory" is reported only
+#   profiles     deployment profiles the check applies to (ADR 0001 = "v1")
+#   depends_on   checks that must pass first; otherwise this one is "unknown"
+#   evidence     field -> type; the probe may emit exactly these fields, and
+#                nothing else ever reaches the report. Types: str, int, bool,
+#                list[str], with a trailing "?" for nullable.
+
+registry_version = 1
+
+[[check]]
+id = "ENV-001"
+title = "Required application secrets are set"
+context = "runtime"
+severity = "required"
+profiles = ["v1"]
+purpose = "The app refuses logins without a review password, signs sessions with the session secret, and cannot write to the destination ESP without its API key."
+probe = "Checks that each named variable is present and non-empty in the runtime environment. Values are never read into the report."
+permission = "None beyond running in a machine of the customer's app."
+timeout_s = 2
+remediation = "Set each missing variable with `fly secrets set NAME=... -a <app>` before installing."
+evidence = { present = "list[str]", missing = "list[str]" }
+[check.params]
+names = ["ESP_REVIEW_PASSWORD", "ESP_REVIEW_SESSION_SECRET", "ESP_BREVO_API_KEY"]
+
+[[check]]
+id = "ENV-002"
+title = "Session secret is not the development default"
+context = "runtime"
+severity = "required"
+profiles = ["v1"]
+purpose = "The app falls back to a public development secret; sessions signed with it can be forged by anyone who has read the source."
+probe = "Compares ESP_REVIEW_SESSION_SECRET with the known public default and reports only whether they match. Unknown when the variable is unset (ENV-001 reports that)."
+permission = "None beyond running in a machine of the customer's app."
+timeout_s = 2
+remediation = "Generate a random secret (for example `python -c 'import secrets; print(secrets.token_urlsafe(48))'`) and set it as ESP_REVIEW_SESSION_SECRET."
+evidence = { is_default = "bool" }
+[check.params]
+name = "ESP_REVIEW_SESSION_SECRET"
+default_value = "dev-secret-not-for-prod"
+
+[[check]]
+id = "ENV-003"
+title = "Model API key is set"
+context = "runtime"
+severity = "advisory"
+profiles = ["v1"]
+purpose = "The discovery report's narrated summary needs the model API. Without the key the report still renders, minus the narration."
+probe = "Checks that ESP_ANTHROPIC_API_KEY is present and non-empty. The value is never read into the report."
+permission = "None beyond running in a machine of the customer's app."
+timeout_s = 2
+remediation = "Set ESP_ANTHROPIC_API_KEY with `fly secrets set` if you want narrated discovery reports; otherwise no action."
+evidence = { present = "list[str]", missing = "list[str]" }
+[check.params]
+names = ["ESP_ANTHROPIC_API_KEY"]
+
+[[check]]
+id = "DB-001"
+title = "Owner role connects to Postgres over TLS"
+context = "operator"
+severity = "required"
+profiles = ["v1"]
+purpose = "Installation applies the schema and creates the app's least-privilege role as the database owner, over an encrypted connection."
+probe = "Opens one connection with ESP_DATABASE_OWNER_URL and records whether it authenticated and whether TLS is in use. A failure is recorded as a class (auth, database, dns, tls, timeout, network), never as the driver's message."
+permission = "The owner connection URL, held on the operator workstation only. Never copied into the app."
+timeout_s = 15
+remediation = "auth: check the owner role name and password. database: check the database name in the URL. dns or network: check the host and port, and that the provider allows connections from this network. tls or connected without TLS: add sslmode=require (or verify-full) to the URL."
+evidence = { connected = "bool", tls = "bool?", sqlstate = "str?", error_class = "str?" }
+[check.params]
+url_var = "ESP_DATABASE_OWNER_URL"
+connect_timeout_s = 10
+
+[[check]]
+id = "DB-002"
+title = "Postgres server version is supported"
+context = "operator"
+severity = "required"
+profiles = ["v1"]
+depends_on = ["DB-001"]
+purpose = "The schema's triggers use EXECUTE FUNCTION, which needs Postgres 11 or later."
+probe = "Reads server_version_num over the owner connection."
+permission = "The owner connection URL (see DB-001)."
+timeout_s = 15
+remediation = "Upgrade the database to Postgres 11 or later (the vendor tests on the provider's current default major version)."
+evidence = { server_version_num = "int", minimum = "int" }
+[check.params]
+url_var = "ESP_DATABASE_OWNER_URL"
+connect_timeout_s = 10
+minimum_version_num = 110000
+
+[[check]]
+id = "DB-003"
+title = "Owner role can install the schema and create the app role"
+context = "operator"
+severity = "required"
+profiles = ["v1"]
+depends_on = ["DB-001"]
+purpose = "Setup creates tables in the public schema and a separate login role for the app, so the app never connects as the owner."
+probe = "Asks Postgres whether the owner role holds CREATE on schema public and the CREATEROLE attribute. Creates nothing."
+permission = "The owner connection URL (see DB-001)."
+timeout_s = 15
+remediation = "Run setup as a role with CREATE on schema public and CREATEROLE (on Neon, the project owner role has both), or have a DBA grant them."
+evidence = { can_create_in_public = "bool", can_create_role = "bool" }
+[check.params]
+url_var = "ESP_DATABASE_OWNER_URL"
+connect_timeout_s = 10
+
+[[check]]
+id = "DB-004"
+title = "Required Postgres extensions are available"
+context = "operator"
+severity = "required"
+profiles = ["v1"]
+purpose = "Lists extensions the schema needs. The v1 schema needs none, so this check reports not applicable until a release adds one."
+probe = "If the release requires extensions, looks each up in pg_available_extensions over the owner connection. Needs no connection when none are required, so it does not wait on DB-001."
+permission = "The owner connection URL (see DB-001)."
+timeout_s = 15
+remediation = "Ask the database provider to enable each missing extension, or install it as a superuser."
+evidence = { required = "list[str]", missing = "list[str]" }
+[check.params]
+url_var = "ESP_DATABASE_OWNER_URL"
+connect_timeout_s = 10
+required = []
+
+[[check]]
+id = "NET-001"
+title = "Destination ESP API is reachable over verified TLS"
+context = "runtime"
+severity = "required"
+profiles = ["v1"]
+purpose = "The migration writes contacts, lists and draft campaigns to the destination ESP over HTTPS."
+probe = "Resolves the API host, opens TCP to port 443, and completes a TLS handshake verifying the certificate against the system trust store. Sends no HTTP request and no credential."
+permission = "Outbound network access from the app's machines."
+timeout_s = 20
+remediation = "dns: check the machine's resolver. tcp: allow outbound 443 to the host in any egress policy. tls: the certificate did not verify; a proxy or custom trust store may be intercepting TLS."
+evidence = { host = "str", port = "int", reached = "str", failed_stage = "str?", error = "str?", tls_version = "str?" }
+[check.params]
+host = "api.brevo.com"
+port = 443
+
+[[check]]
+id = "NET-002"
+title = "Model API is reachable over verified TLS"
+context = "runtime"
+severity = "advisory"
+profiles = ["v1"]
+purpose = "Narrated discovery reports call the model API. The migration itself does not need it."
+probe = "Same as NET-001, against the model API host."
+permission = "Outbound network access from the app's machines."
+timeout_s = 20
+remediation = "Same as NET-001. If the customer does not want model calls from this environment, leave ESP_ANTHROPIC_API_KEY unset and ignore this check."
+evidence = { host = "str", port = "int", reached = "str", failed_stage = "str?", error = "str?", tls_version = "str?" }
+[check.params]
+host = "api.anthropic.com"
+port = 443
+
+[[check]]
+id = "RT-001"
+title = "CPU architecture is amd64"
+context = "runtime"
+severity = "required"
+profiles = ["v1"]
+purpose = "Release images are built and signed for amd64 only (ADR 0001)."
+probe = "Reads the machine architecture reported by the kernel."
+permission = "None beyond running in a machine of the customer's app."
+timeout_s = 2
+remediation = "Run the app on amd64 machines; Fly's shared-cpu presets are amd64."
+evidence = { machine = "str" }
+[check.params]
+accepted = ["x86_64", "amd64", "AMD64"]
+
+[[check]]
+id = "RT-002"
+title = "Machine is sized at 512 MB or more"
+context = "runtime"
+severity = "required"
+profiles = ["v1"]
+purpose = "The app is sized and tested at shared-cpu-1x / 512 MB (ADR 0001)."
+probe = "Reads the memory limit from cgroup v2, then cgroup v1, then /proc/meminfo, and records which source answered. The floor is 450 MiB, not 512: a 512 MB Fly machine reports MemTotal 472,532 kB because the kernel reserves memory (measured on cik-esp, 2026-11-11)."
+permission = "None beyond running in a machine of the customer's app."
+timeout_s = 2
+remediation = "Scale the machines to at least 512 MB: `fly scale memory 512 -a <app>`."
+evidence = { memory_bytes = "int", source = "str", minimum_bytes = "int" }
+[check.params]
+minimum_bytes = 471859200
+
+[[check]]
+id = "RT-003"
+title = "Data volume is writable with free space"
+context = "runtime"
+severity = "required"
+profiles = ["v1"]
+purpose = "The kit's collector and the app's optional error-event file write to the data volume."
+probe = "Writes, flushes, fsyncs and closes a small temporary file at the path, then deletes it, and reads the free space. A full disk often fails only at flush or close, so all three are checked."
+permission = "None beyond running in a machine of the customer's app with the volume mounted."
+timeout_s = 10
+remediation = "Missing path: add the [mounts] section to fly.toml and attach a volume. Not writable: check the mount. Low free space: extend the volume with `fly volumes extend`."
+evidence = { path = "str", exists = "bool", writable = "bool?", errno = "int?", free_bytes = "int?", minimum_free_bytes = "int" }
+[check.params]
+path = "/data"
+minimum_free_bytes = 104857600
+
+[[check]]
+id = "RT-004"
+title = "Error-event file sink is writable"
+context = "runtime"
+severity = "advisory"
+profiles = ["v1"]
+purpose = "When ESP_ERROR_EVENTS_PATH is set, the app also appends error events to that file. Events always reach stderr regardless, so this is advisory."
+probe = "If ESP_ERROR_EVENTS_PATH is set, runs the RT-003 write test in its directory. Not applicable when unset."
+permission = "None beyond running in a machine of the customer's app."
+timeout_s = 10
+remediation = "Point ESP_ERROR_EVENTS_PATH at a file on the data volume (for example /data/esp-error-events.jsonl), or unset it."
+evidence = { path = "str", exists = "bool", writable = "bool?", errno = "int?", free_bytes = "int?", minimum_free_bytes = "int" }
+[check.params]
+path_var = "ESP_ERROR_EVENTS_PATH"
+minimum_free_bytes = 1048576

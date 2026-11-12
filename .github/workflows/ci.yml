@@ -13,4 +13,6 @@ jobs:
       - uses: astral-sh/setup-uv@v4
       - run: uv sync --frozen
       - run: uv run ruff check .
+      - run: uv run python -m kit registry
+      - run: uv run python -m kit requirements --check
       - run: uv run pytest

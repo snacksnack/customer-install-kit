@@ -3,13 +3,14 @@ name = "customer-install-kit"
 version = "0.1.0"
 description = "Install, conformance, and remote triage for an app running in a customer environment the vendor cannot see"
 requires-python = ">=3.12"
-dependencies = []
+dependencies = [
+    "psycopg[binary]>=3.3.8",
+]
 
 [dependency-groups]
 dev = [
     "ruff>=0.6",
     "pytest>=8",
-    "psycopg[binary]>=3.3.8",
 ]
 
 [tool.uv]
@@ -25,3 +26,4 @@ select = ["E", "F", "I", "UP", "B", "SIM"]
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 addopts = "-q"
+pythonpath = ["."]
