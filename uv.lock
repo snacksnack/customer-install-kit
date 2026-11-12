@@ -15,19 +15,21 @@ wheels = [
 name = "customer-install-kit"
 version = "0.1.0"
 source = { virtual = "." }
+dependencies = [
+    { name = "psycopg", extra = ["binary"] },
+]
 
 [package.dev-dependencies]
 dev = [
-    { name = "psycopg", extra = ["binary"] },
     { name = "pytest" },
     { name = "ruff" },
 ]
 
 [package.metadata]
+requires-dist = [{ name = "psycopg", extras = ["binary"], specifier = ">=3.3.8" }]
 
 [package.metadata.requires-dev]
 dev = [
-    { name = "psycopg", extras = ["binary"], specifier = ">=3.3.8" },
     { name = "pytest", specifier = ">=8" },
     { name = "ruff", specifier = ">=0.6" },
 ]
