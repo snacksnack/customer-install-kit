@@ -111,6 +111,10 @@ class Verifier:
             self.deps.say(f"could not list machines: {type(exc).__name__}")
             running = None
         obs["release"] = {"record_digest": want, "running_digests": running}
+        # Order matters: the profile scales to zero, and `fly ssh` cannot reach
+        # a suspended machine (seen live, RC1-641). The health request and the
+        # identity probes go through Fly's proxy, which wakes it, so they run
+        # before the machine step.
         obs["health"] = {"status": self.deps.http_status(f"{self.cfg.public_url}/healthz")}
         obs["identity"] = self.deps.identity_probe(
             self.cfg.public_url, self.secrets.get("ESP_REVIEW_PASSWORD"))

@@ -49,7 +49,29 @@ Every evidence file and the payload are scanned for the workspace's secret value
 
 ## Evidence (live)
 
-To be recorded from the RC1-641 exercise: a healthy run, and a run where `/healthz` stays 200 while the workflow fails.
+2026-11-12, customer org `cik-customer`.
+- **Install:** `kit.install install` of ESP v0.1.4 (digest `sha256:957bc24a…`) created app `cik-esp-p3` against a throwaway Neon branch (`rc1-641-conformance`) of the customer project.
+- **Destination key:** the customer's own Brevo key went into the workspace secrets file only, never into a vendor repo.
+- **Preflight state:** the install ended `installed`, not `installed_not_ready`. ENV-001 passes for the first time because the app now holds a destination key.
+- **Logs:** run logs and reports are in the operator workspace, which is gitignored.
+
+| Run | Condition | Verdict | What the evidence shows |
+|---|---|---|---|
+| 1 `…232650-b3ec` | healthy | **pass**, 14/14, exit 0, 38 s | 37 exported contacts (3 suppressed migrated first, 34 others) plus 1 draft campaign = 38 creates, converged; reconcile PASS with counts per consent state; suppression 100% of 3; cleanup's independent read found 37, deleted the contacts, list and campaign, and re-read nothing remaining; audit seq 5 → 6 (`sign_in`) |
+| 2 `…232804-7991` | `REVOKE INSERT ON review_audit FROM esp_app` (branch only), applied after install | **fail**, exit 1 | `/healthz` 200 before and during. Login returned **500** (CNF-012 fail), so CNF-013 is `insufficient_evidence`. The migration itself still passed: it never touches the database. The app emitted `{"op":"audit.append","error_class":"db","sqlstate":"42501","release":"0.1.4","v":2}` on stdout. Grant restored afterwards (`has_table_privilege` true) |
+| 3 `…232852-3ed4` | grant restored, rerun | **pass**, 14/14, exit 0 | fresh namespace, 38 new creates (none skipped as unchanged), no residue from runs 1 and 2 |
+| 4 `…234230-a8af` | customer Brevo key **deactivated** in the Brevo dashboard after install (dev family 2) | **fail**, exit 1 | `/healthz` 200. The executor stopped at its first call (`GET /account` 401) before any write; the journal holds only `run_failed`. CNF-030 fail; CNF-031/032 `insufficient_evidence`. Cleanup could not read the destination, so CNF-040 is `insufficient_evidence`, never a pass. Every destination call emitted `{"op":"destination.request","error_class":"http","status":401,"route":"GET /account","provider_code":"unauthorized","v":2}` (and the same for the later routes). After reactivation, the same cleanup rerun in the machine from the run's saved `expected.json` read 0 contacts, no list and no campaign: nothing had landed |
+| 5 `…235637-cce0` | key reactivated and fully propagated | **pass**, 14/14, exit 0 | restore left no residue |
+
+**Findings the exercise forced:**
+- **Brevo reactivation is not instant.** For about 4 minutes after the key was re-enabled, roughly 25% of calls (any endpoint, any page size) still returned 401 `API Key is not enabled`. 20 of 20 calls succeeded by 23:56. ESP correctly treats 401 as fatal and does not retry it. Consequence for the fault matrix (Phase 6): a family-2 restore must wait for propagation (probe until clean) before it is measured. Otherwise the "restored" case fails for a reason that is not the fault.
+- **Scale-to-zero vs `fly ssh`.** The machine suspended itself while idle, and SSH then failed silently (empty output). Conformance is not exposed to this, because its health and identity requests go through Fly's proxy and wake the machine first. The runner now says so where the order is set.
+
+Report integrity, on run 1's report:
+- `verify-report` against the install record: valid, with the non-claim printed.
+- The same file with its verdict edited to `fail`: refused, exit 4 ("modified after signing").
+- The genuine file against a record carrying another key: refused, exit 4, naming both fingerprints.
+- `export`: copied `report.signed.json` only.
 
 ## Consequences
 
