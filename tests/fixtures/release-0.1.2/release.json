@@ -1,0 +1,23 @@
+{
+  "db_schema": {
+    "compatible_with": 1,
+    "version": 1
+  },
+  "image": {
+    "digest": "sha256:638215c5b692ca81308220879035e4d3c9ebfe27a7124ff1424f07622f2b5ffd",
+    "platform": "linux/amd64",
+    "repository": "ghcr.io/snacksnack/esp-migration-agent"
+  },
+  "sbom": {
+    "file": "sbom.spdx.json",
+    "format": "spdx-json",
+    "sha256": "4a33353fe3b75cc23fbfb4f6a209fe8c9d198bd6b977b24fa2b4e9f7ade5a6e9"
+  },
+  "schema": "esp.release/1",
+  "source": {
+    "commit": "8b50bea107eea550448170fbce7b4f5c2a44646d",
+    "repository": "snacksnack/esp-migration-agent",
+    "tag": "v0.1.2"
+  },
+  "version": "0.1.2"
+}

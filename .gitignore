@@ -3,3 +3,6 @@ __pycache__/
 .DS_Store
 .env*
 spike/.env*
+spike/customer-ws/*
+!spike/customer-ws/.gitkeep
+.cik-releases/
