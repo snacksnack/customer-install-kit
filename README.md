@@ -15,7 +15,7 @@ Jira: epic RC1-594, phases RC1-638..647.
 
 ## Status
 
-Phase 0A (RC1-638) and 0B (RC1-646) done. Phase 1 (RC1-639): check registry, generated requirements, customer preflight.
+Phase 0A (RC1-638), 0B (RC1-646) and 1 (RC1-639) done. Phase 2 (RC1-640): signed release verification, converging install, rollback, teardown.
 
 ## Preflight
 
@@ -28,9 +28,21 @@ uv run python -m kit requirements [--check]         # regenerate (or check) docs
 
 Exit 0 ready, 1 a required check failed, 2 a required check is unknown, 3 kit error. `--out FILE` writes the JSON report. Customer-facing requirements: [docs/requirements.md](docs/requirements.md) (generated; edit `kit/checks.toml`).
 
+## Install (Phase 2)
+
+```sh
+uv run python -m kit.install verify-release 0.1.2              # verify a signed ESP release
+uv run python -m kit.install install --config install.toml     # install or converge; safe to re-run
+uv run python -m kit.install rollback --to 0.1.1 --config ...  # only if the database schema allows
+uv run python -m kit.install teardown --confirm <app> --config ...
+```
+
+Customer guide, minimum permissions, trusted publisher and recovery planes: [docs/install.md](docs/install.md). Decision: [ADR 0006](docs/adr/0006-install-path.md).
+
 ## Layout
 
-- `kit/` — registry (`checks.toml`), probes, preflight runner, report schema, CLI.
+- `kit/` — registry (`checks.toml`), probes, preflight runner, report schema, CLI. Runs on the workstation and inside the customer machine.
+- `kit/install/` — operator-only: release verification (sigstore), install engine, Fly and image runners, install record.
 - `docs/adr/` — one ADR per decision.
 - `docs/requirements.md` — generated from the registry.
 - `docs/risks.md` — risk log, reviewed at each phase exit.
