@@ -15,7 +15,7 @@ Jira: epic RC1-594, phases RC1-638..647.
 
 ## Status
 
-Phase 0A (RC1-638), 0B (RC1-646) and 1 (RC1-639) done. Phase 2 (RC1-640): signed release verification, converging install, rollback, teardown.
+Phases 0A (RC1-638), 0B (RC1-646), 1 (RC1-639) and 2 (RC1-640) done. Phase 3 (RC1-641): customer-side conformance and signed reports.
 
 ## Preflight
 
@@ -39,9 +39,20 @@ uv run python -m kit.install teardown --confirm <app> --config ...
 
 Customer guide, minimum permissions, trusted publisher and recovery planes: [docs/install.md](docs/install.md). Decision: [ADR 0006](docs/adr/0006-install-path.md).
 
+## Conformance (Phase 3)
+
+```sh
+uv run python -m kit.verify run --config install.toml                    # real namespaced migration inside the machine
+uv run python -m kit.verify verify-report REPORT --record install-record.json
+uv run python -m kit.verify export <run-id> --config install.toml --out DIR [--with-evidence]
+```
+
+Exit 0 pass, 1 fail, 2 insufficient evidence, 3 kit error. Reports stay local until exported. Customer guide: [docs/conformance.md](docs/conformance.md). Decision: [ADR 0007](docs/adr/0007-conformance-and-report-integrity.md).
+
 ## Layout
 
 - `kit/` — registry (`checks.toml`), probes, preflight runner, report schema, CLI. Runs on the workstation and inside the customer machine.
+- `kit/verify/` — operator-only conformance: in-machine runner, CNF checks, signed reports.
 - `kit/install/` — operator-only: release verification (sigstore), install engine, Fly and image runners, install record.
 - `docs/adr/` — one ADR per decision.
 - `docs/requirements.md` — generated from the registry.
