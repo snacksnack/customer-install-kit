@@ -29,7 +29,7 @@ Dependencies may only point to earlier checks in the same context.
 
 ## Findings that changed the design
 
-- **psycopg attaches no SQLSTATE to connect-time errors**, auth failures included (measured against Neon). DB-001 therefore classifies from libpq's message, matched locally and never emitted. The same gap affects ESP's RC1-647 emitter, which only fires on SQLSTATE-carrying exceptions; a rotated database password at runtime would produce no error event. Tracked as a follow-up on the ESP side.
+- **psycopg attaches no SQLSTATE to connect-time errors**, auth failures included (measured against Neon). DB-001 therefore classifies from libpq's message, matched locally and never emitted. The same gap reaches ESP's RC1-647 events: a rotated database password surfaces as `psycopg_pool.PoolTimeout` after the pool timeout, and the event records `sqlstate: null`, which cannot be told apart from DNS, network, TLS or pool exhaustion. Tracked as RC1-648.
 - **A 512 MB Fly machine reports MemTotal 472,532 kB**, with no cgroup limit. A literal 512 MiB floor would fail every correctly sized machine, so RT-002's floor is 450 MiB, which still separates a 256 MB machine.
 - ENV-002 originally depended on ENV-001, so a missing Brevo key blocked the session-secret check. Dependencies are now only where the check truly cannot run without the other.
 
