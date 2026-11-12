@@ -43,8 +43,8 @@ class FakeFly:
         self.staged_values = []
         self.calls = []
 
-    def app_exists(self, org, app):
-        return app in self.apps
+    def app_org(self, app):
+        return "acme-org" if app in self.apps else None
 
     def volumes(self, app, name):
         return [{"id": i, "name": n} for i, (a, n) in self.vols.items() if a == app and n == name]
@@ -324,3 +324,10 @@ def test_generated_secrets_land_in_the_customer_file_mode_600(world):
     assert values["ESP_REVIEW_PASSWORD"] and values["ESP_REVIEW_SESSION_SECRET"]
     assert stat.S_IMODE(os.stat(world["dir"] / "report-key.pem").st_mode) == 0o600
     assert read_record(world)["report_key"]["fingerprint"].startswith("sha256:")
+
+
+def test_an_app_in_another_org_is_never_adopted(world):
+    world["fly"].app_org = lambda app: "someone-else"
+    with pytest.raises(InstallError, match="belongs to org someone-else"):
+        world["build"]().install()
+    assert not world["fly"].created("create_app")

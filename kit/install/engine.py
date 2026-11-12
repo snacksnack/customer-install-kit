@@ -293,7 +293,10 @@ class Installer:
 
     def _step_app(self) -> None:
         known = self.record["resources"].get("app")
-        if self.fly.app_exists(self.cfg.fly_org, self.cfg.app):
+        org = self.fly.app_org(self.cfg.app)
+        if org is not None and org != self.cfg.fly_org:
+            raise InstallError(f"app {self.cfg.app} belongs to org {org}, not {self.cfg.fly_org}")
+        if org is not None:
             ownership = known["ownership"] if known else rec.ADOPTED
             action = "exists"
         else:
@@ -504,7 +507,7 @@ class Installer:
         retained = "retained (adopted, not created by this install)"
         app_owned = bool(app) and app["ownership"] == rec.CREATED
         vol_owned = bool(vol) and vol["ownership"] == rec.CREATED
-        app_present = bool(app) and self.fly.app_exists(self.cfg.fly_org, self.cfg.app)
+        app_present = bool(app) and self.fly.app_org(self.cfg.app) == self.cfg.fly_org
         # An adopted app can hold a volume this install created: destroy just
         # that volume, by the id the record holds, never by name.
         live = self.fly.volumes(self.cfg.app, self.cfg.volume) if app_present else []

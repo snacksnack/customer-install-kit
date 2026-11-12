@@ -31,9 +31,9 @@ Exit 0 ready, 1 a required check failed, 2 a required check is unknown, 3 kit er
 ## Install (Phase 2)
 
 ```sh
-uv run python -m kit.install verify-release 0.1.2              # verify a signed ESP release
+uv run python -m kit.install verify-release 0.1.3              # verify a signed ESP release
 uv run python -m kit.install install --config install.toml     # install or converge; safe to re-run
-uv run python -m kit.install rollback --to 0.1.1 --config ...  # only if the database schema allows
+uv run python -m kit.install rollback --to 0.1.2 --config ...  # only if the database schema allows
 uv run python -m kit.install teardown --confirm <app> --config ...
 ```
 

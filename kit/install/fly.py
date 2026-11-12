@@ -52,8 +52,17 @@ class Fly:
 
     # -- reads -----------------------------------------------------------
 
-    def app_exists(self, org: str, app: str) -> bool:
-        return any(a.get("Name") == app for a in self.json("apps", "list", "--org", org) or [])
+    def app_org(self, app: str) -> str | None:
+        """The org slug that owns `app`, or None if this identity cannot see
+        it. App-scoped: an app deploy token can answer it, unlike `apps list
+        --org`. Under a scoped token "not found" also covers "not yours", so
+        callers treat None as "try to create", which such a token cannot do."""
+        result = self.run("status", "-a", app, "--json", check=False)
+        if result.code != 0:
+            if "Could not find App" in result.stderr:
+                return None
+            raise FlyError(["status", "-a", app], result)
+        return ((json.loads(result.stdout) or {}).get("Organization") or {}).get("Slug")
 
     def volumes(self, app: str, name: str) -> list[dict]:
         return [v for v in self.json("volumes", "list", "-a", app) or [] if v.get("name") == name]
