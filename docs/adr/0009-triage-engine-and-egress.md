@@ -117,10 +117,11 @@ Rules only on the same bundle stop at `insufficient_evidence`, because rules alo
 
 **Telemetry inspection.** Three captured payloads from the live family 2 and family 1 runs held none of these: the table name, the SQLSTATE, the role, the app name, the install id, any bundle digest, or the words statement and remedy. All passed `validate()`. One posted to the intake and returned 202. In tests, planted canaries that reach the model and the case store (proving they travelled the content channel) are absent from every payload and from the record. `validate()` rejects added input, output, free-text tags, non-allowlisted metrics, and error messages.
 
+**Datadog UI check (2026-11-13).** LLM Observability → Traces shows 7 `cik-triage` traces, all `env:dev`, `service:cik-triage`, `version:2026-11-13`, each with Input and Output both "No content" (the PR Review Agent rows beside them show captured content, for contrast). The `llm_observability` scalar API confirms the root tags indexed: 4 `mode:agent` rounds (2 `followup_requested`, 2 `diagnosis`) and 3 `mode:rules` rounds (`rules_only`, microsecond durations, no model call), with 44 spans in all (7 workflow, 12 llm, 25 tool).
+
 **Cost re-measurement (the Phase 5 checkpoint ADR 0004 requires).** A round costs $0.04 to $0.25. A two-round case costs about $0.38. All live triage in this phase cost about $0.86. The Phase 6 matrix (12 cases plus about 6 controls, up to 2 rounds each, agent and rules) projects to roughly $7 to $15 of model spend. That is well inside the $120 ceiling, and the ceiling stands.
 
 ## Not done here
 
 - Family 2's live second step. The rules and tests cover all three `FUP-DEST-AUTH` answers, and the live family 2 round requested the right check, but running the probe against a deactivated key needs a human in the Brevo dashboard (ADR 0004). It is run with the Phase 6 matrix.
-- Datadog UI confirmation of the `cik-triage` spans. The intake returned 202. The LLM Obs pane has no search API, so a screenshot is the check.
 - Held-out evaluation, the public-randomness draw, and the agent-vs-rules comparison (RC1-644).
