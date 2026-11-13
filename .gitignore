@@ -6,3 +6,5 @@ spike/.env*
 spike/customer-ws/*
 !spike/customer-ws/.gitkeep
 .cik-releases/
+triage/in/
+triage/case-store/

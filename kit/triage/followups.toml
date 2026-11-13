@@ -1,0 +1,45 @@
+# Allowlisted follow-up checks (RC1-643, ADR 0009).
+#
+# Triage may REQUEST one of these by id. The customer runs it with the kit
+# (`python -m kit.triage.followup run <id> ...`), reviews the supplemental
+# bundle it writes, and exports it. Triage never runs anything in the
+# customer's environment, and there is no way to ask for a check that is not
+# listed here: the customer-side runner refuses unknown ids.
+#
+# Every check is read-only. Its output is built from fixed fields (numbers,
+# enums, the kit's own object names), signed, and scanned like any bundle.
+# Part of the frozen triage registry; bump `version` on any change.
+
+version = 1
+
+[checks.FUP-DB-PRIV]
+title = "App role privilege matrix"
+purpose = "Which of ESP's expected grants the app role holds right now, read with the role's own credential."
+runs_on = "operator workstation"
+permissions = [
+  "Connect to the customer database with the app role's own credential (ESP_DATABASE_URL from the install's secrets file).",
+  "Run read-only catalog functions: has_database_privilege, has_schema_privilege, has_table_privilege, for ESP's own tables only.",
+]
+returns = "connected (bool), connect_class when it does not connect, and for each expected grant: object, privilege, expected, granted."
+discriminates = "Which privilege a 42501 is missing (schema USAGE or a table privilege), whether it is still missing now, and whether other grants are gone too."
+
+[checks.FUP-DEST-AUTH]
+title = "Destination credential, probed from two places"
+purpose = "Whether the destination accepts the configured key at all, and whether the answer depends on where the call comes from."
+runs_on = "operator workstation and, over `fly ssh`, the app's machine"
+permissions = [
+  "Read ESP_BREVO_API_KEY from the install's secrets file (workstation) and from the app's environment (machine).",
+  "HTTPS GET https://api.brevo.com/v3/account and GET /v3/contacts/lists?limit=1, from each place. Read-only; response bodies are discarded except Brevo's error code.",
+]
+returns = "For each vantage (workstation, machine) and route: HTTP status and Brevo's error code. No response body is kept."
+discriminates = "A rejected key (refused everywhere), a source-address restriction (refused from the machine only), and a refusal of one route while the key itself is accepted."
+
+[checks.FUP-VOLUME]
+title = "Volume capacity"
+purpose = "How full the app's data volume is now, and how much of it ESP's own files hold."
+runs_on = "operator workstation, over `fly ssh` to the app's machine"
+permissions = [
+  "`fly ssh console` running read-only `df` and `du` on /data and `stat` on ESP's error-event file.",
+]
+returns = "Block and inode totals and use for /data, the size of ESP's error-event file, and the bytes in /data outside it. No file names."
+discriminates = "Whether the volume is still full, and whether ESP's own files or something else fills it."

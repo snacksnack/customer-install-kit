@@ -1,0 +1,48 @@
+# The triage runtime and its only way out (RC1-643, ADR 0009).
+#
+#   docker compose -f triage/compose.yaml run --rm triage run /in/bundle.tar.gz \
+#       --fingerprint sha256:... --mode agent
+#   docker compose -f triage/compose.yaml run --rm --entrypoint python triage \
+#       -I /app/isolation_test.py
+#
+# `triage` sits only on `sealed`, an internal network with no route out.
+# `egress` sits on `sealed` and on `outside`, and forwards CONNECT to the
+# allowlisted hosts only. Vendor credentials (model API key, Datadog API key)
+# come from the host environment; no customer credential exists here.
+name: cik-triage
+
+services:
+  egress:
+    build: ./egress
+    networks: [sealed, outside]
+    read_only: true
+    tmpfs: [/run/tinyproxy, /var/log/tinyproxy]
+
+  triage:
+    build:
+      context: ..
+      dockerfile: triage/Dockerfile
+    depends_on: [egress]
+    networks: [sealed]
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    tmpfs: [/tmp, /home/triage]
+    environment:
+      HTTPS_PROXY: http://egress:8888
+      HTTP_PROXY: http://egress:8888
+      https_proxy: http://egress:8888
+      http_proxy: http://egress:8888
+      NO_PROXY: ""
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      DD_API_KEY: ${DD_API_KEY:-}
+      DD_ENV: ${DD_ENV:-dev}
+      PROBE_PG_HOST: ${PROBE_PG_HOST:-}
+    volumes:
+      - ${CIK_TRIAGE_IN:-./in}:/in:ro
+      - ${CIK_TRIAGE_CASES:-./case-store}:/case-store
+
+networks:
+  sealed:
+    internal: true
+  outside: {}

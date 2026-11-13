@@ -31,3 +31,19 @@ jobs:
       - run: uv run pytest
         env:
           CIK_TEST_PG_ADMIN_URL: postgresql://postgres:ci-only@localhost:5432/postgres
+
+  # ADR 0002 / ADR 0009: the triage runtime's identity holds nothing and its
+  # network reaches only the allowlisted hosts. Re-proven on every change.
+  triage-isolation:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: docker compose -f triage/compose.yaml build
+      - run: mkdir -p triage/in triage/case-store
+      - run: >-
+          docker compose -f triage/compose.yaml run --rm --entrypoint python
+          triage -I /app/isolation_test.py
+        env:
+          # A stand-in: the proxy refuses by name and port, so any customer
+          # database hostname proves the same policy.
+          PROBE_PG_HOST: ep-example-123456.us-east-2.aws.neon.tech
