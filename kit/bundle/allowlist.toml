@@ -1,0 +1,82 @@
+# What a diagnostic bundle may contain (RC1-642, ADR 0008).
+#
+# The bundle is BUILT from these paths; nothing reaches it by surviving a
+# scrub. A field not listed here is dropped, whatever it holds. Paths are
+# dotted; `[]` walks every element of a list, `*` every value of a mapping
+# (keeping its keys); a path ending in `{keys}` keeps a mapping's key names
+# and drops its values.
+#
+# Bump `version` on any change; the manifest records it, and a vendor-side
+# inspect refuses a version it does not know.
+
+version = 1
+
+[bounds]
+max_files = 16
+max_file_bytes = 262144        # 256 KiB per file
+max_bundle_bytes = 1048576     # 1 MiB for all files together
+max_events = 500               # error events kept per sink (newest first)
+max_sink_read_bytes = 262144   # how much of the file sink's tail is read
+source_timeout_s = 90          # one source
+total_timeout_s = 300          # the whole collection
+
+[sources.fly_status]
+purpose = "Whether Fly considers the app deployed, and its release number."
+paths = ["Status", "Version", "Deployed", "PlatformVersion"]
+
+[sources.fly_machines]
+purpose = "Machine state, image digest, health-check status, and lifecycle events (exits, restarts, OOM kills)."
+paths = [
+  "[].id", "[].state", "[].region", "[].version", "[].created_at", "[].updated_at",
+  "[].host_status", "[].image_ref.digest",
+  "[].checks[].name", "[].checks[].status", "[].checks[].updated_at",
+  "[].events[].type", "[].events[].status", "[].events[].source", "[].events[].timestamp",
+  "[].events[].request.exit_event.exit_code",
+  "[].events[].request.exit_event.oom_killed",
+  "[].events[].request.exit_event.requested_stop",
+  "[].events[].request.exit_event.restarting",
+  "[].events[].request.exit_event.guest_exit_code",
+  "[].events[].request.exit_event.guest_signal",
+  "[].events[].request.exit_event.signal",
+  "[].config.guest.cpu_kind", "[].config.guest.cpus", "[].config.guest.memory_mb",
+  "[].config.mounts[].path", "[].config.mounts[].volume", "[].config.mounts[].size_gb",
+  "[].config.restart.policy",
+  "[].config.env{keys}",
+]
+
+[sources.fly_releases]
+purpose = "Deploy history: which release, when, and whether it went stable."
+paths = [
+  "[].Version", "[].Status", "[].Stable", "[].InProgress", "[].CreatedAt",
+  "[].DeploymentStrategy", "[].ImageRef", "[].Reason",
+]
+
+[sources.fly_secrets]
+purpose = "Which secrets the app has and whether each is deployed or only staged. Names only: Fly's per-secret digest is dropped."
+paths = ["[].name", "[].status"]
+
+[sources.install_record]
+purpose = "What was installed, by which release, which resources it owns, and the last runtime preflight summary."
+paths = [
+  "schema", "install_id", "profile", "state", "created_at", "updated_at",
+  "release.version", "release.image", "release.commit", "release.db_schema.version",
+  "release.db_schema.compatible_with",
+  "target_release.version", "installed_version",
+  "resources.app.name", "resources.app.ownership", "resources.volume.id",
+  "resources.volume.ownership", "resources.database.ownership",
+  "resources.database.migrated_at", "resources.database.schema.version",
+  "resources.database.schema.compatible_with",
+  "secrets.pushed[]", "secrets.generated[]",
+  "report_key.algorithm", "report_key.fingerprint",
+  "steps.*.status", "runtime_preflight.exit_status", "runtime_preflight.summary.*",
+  "runtime_preflight.failing_required[]", "runtime_preflight.run_id",
+]
+
+[sources.conformance]
+purpose = "The latest conformance verdict and each check's outcome and reason (evidence stays in the workspace)."
+paths = [
+  "schema", "run_id", "release.version", "check_version", "started_at", "finished_at",
+  "verdict", "summary.*",
+  "observations[].check_id", "observations[].name", "observations[].outcome",
+  "observations[].reason",
+]

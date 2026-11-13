@@ -6,6 +6,10 @@ primary_region = "{region}"
 [env]
   ESP_ENVIRONMENT = "production"
   ESP_PUBLIC_URL = "{public_url}"
+  # ESP's additive error-event file sink (esp ADR-0026), on the volume so it
+  # outlives the process and the platform log buffer (RC1-642, ADR 0008).
+  # The volume root, because ESP opens the path without creating directories.
+  ESP_ERROR_EVENTS_PATH = "/data/esp-error-events.jsonl"
 
 [mounts]
   source = "{volume}"
