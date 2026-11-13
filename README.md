@@ -15,7 +15,7 @@ Jira: epic RC1-594, phases RC1-638..647.
 
 ## Status
 
-Phases 0A (RC1-638), 0B (RC1-646), 1 (RC1-639) and 2 (RC1-640) done. Phase 3 (RC1-641) done: customer-side conformance and signed reports. Phase 4 (RC1-642): diagnostic bundles.
+Phases 0A (RC1-638), 0B (RC1-646), 1 (RC1-639) and 2 (RC1-640) done. Phase 3 (RC1-641) done: customer-side conformance and signed reports. Phase 4 (RC1-642) done: diagnostic bundles. Phase 5 (RC1-643): rules-first triage, a bounded agent with allowlisted follow-up checks, and a sealed runtime.
 
 ## Preflight
 
@@ -71,3 +71,14 @@ Exit 0 ok, 3 kit error, 4 refused. Nothing is uploaded. Customer guide: [docs/bu
 - `docs/risks.md` — risk log, reviewed at each phase exit.
 - `docs/phase0/`, `docs/phase0b/` — Phase 0 working documents and evidence.
 - `spike/` — Phase 0 live customer-org artifacts.
+
+## Triage (Phase 5)
+
+```sh
+uv run python -m kit.triage run FILE --fingerprint FP [--supplement S] [--mode rules|agent]   # vendor
+uv run python -m kit.triage show <case-id>                                                     # findings and proposed remedy
+uv run python -m kit.triage.followup run --request REQ.json --config install.toml             # customer: one allowlisted check
+docker compose -f triage/compose.yaml run --rm triage run /in/FILE --fingerprint FP --mode agent  # sealed runtime
+```
+
+Guide: [docs/triage.md](docs/triage.md). Decision: [ADR 0009](docs/adr/0009-triage-engine-and-egress.md).

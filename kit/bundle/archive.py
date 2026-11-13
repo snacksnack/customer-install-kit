@@ -222,9 +222,12 @@ def resolve(inspected: Inspected, reference: str) -> Any:
     file, _, pointer = rest.partition("#")
     if digest != inspected.digest:
         raise BundleRefused("reference names another bundle")
-    if file not in inspected.files:
+    if file == collect.MANIFEST:
+        node: Any = inspected.manifest  # the signed payload: source status, drop counts
+    elif file in inspected.files:
+        node = inspected.files[file]
+    else:
         raise BundleRefused(f"no file {file!r} in this bundle")
-    node: Any = inspected.files[file]
     for token in [t for t in pointer.split("/")[1:]] if pointer else []:
         token = token.replace("~1", "/").replace("~0", "~")
         if isinstance(node, list) and POINTER_TOKEN.match(token) and int(token) < len(node):

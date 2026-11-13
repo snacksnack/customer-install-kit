@@ -4,6 +4,7 @@ version = "0.1.0"
 description = "Install, conformance, and remote triage for an app running in a customer environment the vendor cannot see"
 requires-python = ">=3.12"
 dependencies = [
+    "anthropic>=2.8.0",
     "api-compatibility-lab",
     "cryptography>=44",
     "psycopg[binary]>=3.3.8",

@@ -1,0 +1,76 @@
+# Versioned support knowledge for triage (RC1-643, ADR 0009).
+#
+# Written from the development cases only: the six RC1-642 bundles and the
+# three development fault families in docs/phase0/fault-families.md. Nothing
+# here may be written from the reserved held-out candidates. A signal this
+# file does not list is UNKNOWN to triage, and a rule meeting it says so
+# instead of guessing.
+#
+# Part of the frozen triage registry (kit/triage/registry.py). Bump `version`
+# on any change; every triage record carries the registry digest.
+
+version = 1
+
+# What each ESP operation touches, from ESP's own code (review_ui/db_setup.py
+# grants, the audit/session/SCIM stores). A 42501 on an operation narrows the
+# missing privilege to these objects; it does not say which one.
+[operations."audit.append"]
+needs = ["schema public USAGE", "review_audit INSERT"]
+[operations."audit.read"]
+needs = ["schema public USAGE", "review_audit SELECT"]
+[operations."audit.verify"]
+needs = ["schema public USAGE", "review_audit SELECT"]
+[operations."sessions.load"]
+needs = ["schema public USAGE", "review_sso_sessions SELECT"]
+[operations."sessions.save"]
+needs = ["schema public USAGE", "review_sso_sessions INSERT", "review_sso_sessions UPDATE"]
+[operations."sessions.drop"]
+needs = ["schema public USAGE", "review_sso_sessions DELETE"]
+[operations."sessions.revoke"]
+needs = ["schema public USAGE", "review_sso_sessions UPDATE"]
+[operations."sessions.claim"]
+needs = ["schema public USAGE", "review_sso_sessions UPDATE"]
+[operations."scim.read"]
+needs = ["schema public USAGE", "review_scim_users SELECT"]
+[operations."scim.write"]
+needs = ["schema public USAGE", "review_scim_users INSERT", "review_scim_users UPDATE",
+         "review_scim_users DELETE"]
+
+# The app role's expected grants (ESP review_ui/db_setup.grant_app_role).
+# review_audit is append-only by design: UPDATE and DELETE must be absent.
+[app_role]
+name = "esp_app"
+expected = [
+  "database CONNECT", "schema public USAGE",
+  "review_audit SELECT", "review_audit INSERT",
+  "review_sso_sessions SELECT", "review_sso_sessions INSERT",
+  "review_sso_sessions UPDATE", "review_sso_sessions DELETE",
+  "review_scim_users SELECT", "review_scim_users INSERT",
+  "review_scim_users UPDATE", "review_scim_users DELETE",
+]
+must_not_have = ["review_audit UPDATE", "review_audit DELETE"]
+
+[sqlstates]
+42501 = "insufficient_privilege: the session is connected and authenticated; the statement needs a privilege the role does not hold"
+
+[connect_classes]
+auth = "the database rejected the role's credential (password authentication failed)"
+
+# Destination (Brevo) answers seen in development family 2: the host answers,
+# and refuses this request.
+[provider_codes]
+unauthorized = "the destination did not accept the request's credential"
+permission_denied = "the destination accepted the credential and refused this operation"
+method_not_allowed = "the destination refused this method on this route"
+not_enough_credits = "the destination refused the operation for quota"
+
+[errno]
+ENOSPC = "no space left on the device: the volume is full"
+EDQUOT = "disk quota exceeded"
+
+[remedies]
+db_credential = "Re-sync the app role credential: run `python -m kit.install install --config install.toml` (the app_role step re-creates the credential when the stored one no longer connects), then `python -m kit.verify run` to confirm."
+db_grants = "Restore the app role's missing grants as the database owner. The exact statements come from the privilege matrix; ESP's grant set is the reference (review_ui/db_setup.py). Then run `python -m kit.verify run` to confirm."
+destination_key_rejected = "Reactivate the Brevo API key, or create a new one, in the Brevo dashboard; put it in the install's secrets file as ESP_BREVO_API_KEY; run `python -m kit.install install` to push it; then `python -m kit.verify run`. A reactivated key can take minutes to propagate: re-run verify until it passes."
+destination_source_restricted = "The key works from the workstation and not from the app's machine: Brevo's authorized-IP list is refusing the machine. Add the app's egress address in Brevo (Security > Authorized IPs), or turn that restriction off, then `python -m kit.verify run`."
+volume_full = "Free space on the app's volume or extend it (`fly volumes extend <id> -s <GB> -a <app>`), after reviewing what fills it. Then `python -m kit.verify run`, and collect a new bundle soon after: on a full volume ESP's error-event file cannot record."
