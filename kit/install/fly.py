@@ -70,6 +70,11 @@ class Fly:
     def machines(self, app: str) -> list[dict]:
         return self.json("machines", "list", "-a", app) or []
 
+    def secret_digests(self, app: str) -> dict[str, str]:
+        """Fly's digest per secret name (never a value)."""
+        listed = self.json("secrets", "list", "-a", app) or []
+        return {s["name"]: s.get("digest", "") for s in listed}
+
     def secret_status(self, app: str) -> dict[str, str]:
         listed = self.json("secrets", "list", "-a", app) or []
         return {s["name"]: s.get("status", "") for s in listed}

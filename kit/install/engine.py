@@ -3,7 +3,8 @@
 Install is an ordered list of steps. Every step observes before it acts, so
 running the whole list again after any failure converges: an existing app or
 volume is reused (never duplicated), a working app-role URL is kept (never
-re-passworded), unchanged secrets are not re-staged, and a machine already
+re-passworded), unchanged secrets are not re-staged (a secret changed on Fly
+outside the kit is), and a machine already
 running the target digest with nothing staged is not redeployed. The schema
 step only ever migrates forward. No step resets or deletes data.
 
@@ -50,6 +51,11 @@ KIT_ROOT = Path(__file__).resolve().parent.parent
 TEMPLATE = Path(__file__).with_name("fly.toml.tmpl")
 REPORT_KEY = "report-key.pem"
 PUSHED_DIGESTS = ".cik-pushed.sha256"
+# Fly's own per-secret digests as of the last completed install. Fly's digest
+# format is undocumented, so it is compared only with itself: a change means a
+# secret was set outside the kit (`fly secrets set`), and the file's values are
+# re-staged. Without this, a secret replaced on Fly looked "unchanged" (RC1-644).
+FLY_DIGESTS = ".cik-fly-secrets.json"
 HEALTH_ATTEMPTS = 30
 HEALTH_INTERVAL_S = 2.0
 DEPLOY_SETTLE_ATTEMPTS = 20
@@ -267,6 +273,7 @@ class Installer:
             self._save()
             if name == fail_after:
                 raise InjectedFailure(f"deliberate failure after step {name} (--fail-after)")
+        self._record_fly_digests()
         failing = self.record["runtime_preflight"]["failing_required"]
         self.record["state"] = rec.STATE_NOT_READY if failing else rec.STATE_INSTALLED
         if previous != self.release.version:
@@ -413,7 +420,12 @@ class Installer:
         marker = self.cfg.workdir / PUSHED_DIGESTS
         status = self.fly.secret_status(self.cfg.app)
         all_on_fly = all(status.get(k) for k in subset)
-        if marker.exists() and marker.read_text() == digests and all_on_fly:
+        self._pushed_names = sorted(subset)
+        drifted = self._fly_drift(self._pushed_names)
+        if drifted:
+            self._say(f"secrets changed on Fly outside the kit: {', '.join(drifted)}; "
+                      f"re-staging from {self.cfg.secrets_file.name}")
+        if marker.exists() and marker.read_text() == digests and all_on_fly and not drifted:
             action = "unchanged"
         else:
             self.fly.stage_secrets(self.cfg.app, subset)
@@ -422,7 +434,28 @@ class Installer:
                 f.write(digests)
             action = "staged"
         self.record["secrets"] = {"pushed": sorted(subset), "generated": generated}
-        rec.step(self.record, "secrets", "done", action=action)
+        rec.step(self.record, "secrets", "done", action=action,
+                 **({"drifted": drifted} if drifted else {}))
+
+    def _fly_drift(self, names: list[str]) -> list[str]:
+        """Secrets whose Fly digest differs from the last completed install's.
+        No record yet (a first install, or one made before this check): none."""
+        path = self.cfg.workdir / FLY_DIGESTS
+        if not path.exists():
+            return []
+        recorded = json.loads(path.read_text())
+        now = self.fly.secret_digests(self.cfg.app)
+        return [n for n in names if n in recorded and now.get(n) != recorded[n]]
+
+    def _record_fly_digests(self) -> None:
+        names = getattr(self, "_pushed_names", None)
+        if names is None:
+            return
+        now = self.fly.secret_digests(self.cfg.app)
+        fd = os.open(self.cfg.workdir / FLY_DIGESTS, os.O_WRONLY | os.O_CREAT | os.O_TRUNC,
+                     0o600)
+        with os.fdopen(fd, "w") as f:
+            json.dump({n: now[n] for n in names if n in now}, f, sort_keys=True)
 
     def _fly_toml(self) -> Path:
         path = self.cfg.workdir / "fly.toml"

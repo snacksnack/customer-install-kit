@@ -71,7 +71,7 @@ The steps are: verify release, generate the report keypair, operator preflight, 
 
 Exit codes: 0 installed, 1 installed but a required runtime check is not passing (see `preflight-runtime.json`), 4 refused, 5 a step failed (re-run to resume), 3 kit error.
 
-**What stays on your workstation:** `.env.cik` (all secrets; the owner URL is never pushed to Fly), `report-key.pem` (the private half of the per-install report key), `.cik-pushed.sha256` (hashes used to skip unchanged secrets). **What you can share:** `install-record.json`, `preflight-*.json`.
+**What stays on your workstation:** `.env.cik` (all secrets; the owner URL is never pushed to Fly), `report-key.pem` (the private half of the per-install report key), `.cik-pushed.sha256` (hashes used to skip unchanged secrets), `.cik-fly-secrets.json` (Fly's digests per secret name at the last install, so a secret changed with `fly secrets set` is noticed and re-staged from `.env.cik`). **What you can share:** `install-record.json`, `preflight-*.json`.
 
 ## Recovery
 
