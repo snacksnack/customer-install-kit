@@ -5,6 +5,7 @@ Fly, the image and the release are fakes with state, so "converges" means
 the second run made no create/stage/deploy call, not merely that it passed.
 """
 
+import hashlib
 import json
 import os
 import stat
@@ -40,6 +41,7 @@ class FakeFly:
         self.vols = dict(volumes or {})          # id -> (app, name)
         self.machine_digest = {}                  # app -> digest
         self.secrets = {}                         # app -> {name: status}
+        self.digests = {}                         # app -> {name: digest}
         self.staged_values = []
         self.calls = []
 
@@ -56,6 +58,14 @@ class FakeFly:
     def secret_status(self, app):
         return dict(self.secrets.get(app, {}))
 
+    def secret_digests(self, app):
+        return dict(self.digests.get(app, {}))
+
+    def set_outside_the_kit(self, app, name):
+        """`fly secrets set` by hand: a new value, a new digest, deployed."""
+        self.digests.setdefault(app, {})[name] = f"hand-{len(self.calls)}"
+        self.secrets.setdefault(app, {})[name] = "Deployed"
+
     def create_app(self, org, app):
         self.calls.append(("create_app", app))
         self.apps.add(app)
@@ -70,6 +80,8 @@ class FakeFly:
         self.calls.append(("stage_secrets", tuple(sorted(values))))
         self.staged_values.append(dict(values))
         self.secrets.setdefault(app, {}).update({k: "Staged" for k in values})
+        self.digests.setdefault(app, {}).update(
+            {k: hashlib.sha256(v.encode()).hexdigest()[:16] for k, v in values.items()})
 
     def deploy(self, app, config, image):
         self.calls.append(("deploy", image))
@@ -194,6 +206,30 @@ def test_second_install_converges_with_no_writes(world):
     before = list(world["fly"].calls), list(world["db"].calls)
     assert world["build"]().install() == 0
     assert (world["fly"].calls, world["db"].calls) == before
+
+
+def test_secret_changed_on_fly_outside_the_kit_is_restaged(world):
+    world["build"]().install()
+    world["fly"].set_outside_the_kit("acme-esp", "ESP_REVIEW_PASSWORD")
+    calls = len(world["fly"].calls)
+    assert world["build"]().install() == 0
+    new = [c[0] for c in world["fly"].calls[calls:]]
+    assert new == ["stage_secrets", "deploy"]
+    step = read_record(world)["steps"]["secrets"]
+    assert step["action"] == "staged" and step["drifted"] == ["ESP_REVIEW_PASSWORD"]
+    assert any("changed on Fly outside the kit" in s for s in world["said"])
+    calls = len(world["fly"].calls)
+    world["build"]().install()
+    assert world["fly"].calls[calls:] == []
+
+
+def test_install_made_before_the_drift_check_does_not_restage(world):
+    world["build"]().install()
+    (world["dir"] / ".cik-fly-secrets.json").unlink()
+    calls = len(world["fly"].calls)
+    world["build"]().install()
+    assert world["fly"].calls[calls:] == []
+    assert (world["dir"] / ".cik-fly-secrets.json").exists()
 
 
 @pytest.mark.parametrize("step", STEPS)
