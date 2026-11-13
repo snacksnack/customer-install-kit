@@ -15,7 +15,7 @@ Jira: epic RC1-594, phases RC1-638..647.
 
 ## Status
 
-Phases 0A (RC1-638), 0B (RC1-646), 1 (RC1-639) and 2 (RC1-640) done. Phase 3 (RC1-641): customer-side conformance and signed reports.
+Phases 0A (RC1-638), 0B (RC1-646), 1 (RC1-639) and 2 (RC1-640) done. Phase 3 (RC1-641) done: customer-side conformance and signed reports. Phase 4 (RC1-642): diagnostic bundles.
 
 ## Preflight
 
@@ -49,10 +49,22 @@ uv run python -m kit.verify export <run-id> --config install.toml --out DIR [--w
 
 Exit 0 pass, 1 fail, 2 insufficient evidence, 3 kit error. Reports stay local until exported. Customer guide: [docs/conformance.md](docs/conformance.md). Decision: [ADR 0007](docs/adr/0007-conformance-and-report-integrity.md).
 
+## Diagnostic bundles (Phase 4)
+
+```sh
+uv run python -m kit.bundle collect --config install.toml [--case SLUG]   # outside ESP; works during a crash loop
+uv run python -m kit.bundle review <bundle-id> --config install.toml      # exactly what would leave
+uv run python -m kit.bundle export <bundle-id> --config install.toml --out FILE
+uv run python -m kit.bundle inspect FILE [--fingerprint FP] [--ref REF]   # vendor: validate an untrusted bundle
+```
+
+Exit 0 ok, 3 kit error, 4 refused. Nothing is uploaded. Customer guide: [docs/bundle.md](docs/bundle.md). Decision: [ADR 0008](docs/adr/0008-diagnostic-bundles.md).
+
 ## Layout
 
 - `kit/` — registry (`checks.toml`), probes, preflight runner, report schema, CLI. Runs on the workstation and inside the customer machine.
 - `kit/verify/` — operator-only conformance: in-machine runner, CNF checks, signed reports.
+- `kit/bundle/` — diagnostic bundles: allowlist, event validation, sources, scanner, collector, export and untrusted inspect.
 - `kit/install/` — operator-only: release verification (sigstore), install engine, Fly and image runners, install record.
 - `docs/adr/` — one ADR per decision.
 - `docs/requirements.md` — generated from the registry.
