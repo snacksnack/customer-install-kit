@@ -14,6 +14,7 @@ against the deterministic baseline on the same evidence.
 """
 
 import secrets
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
@@ -57,6 +58,27 @@ def eval_record(case_id: str, round_no: int, run_id: str, mode: str, result: rul
     return rec
 
 
+def rules_followup(ev: Evidence, result: rules.Result, issued: int,
+                   rounds: int) -> dict[str, Any] | None:
+    """The follow-up the rules themselves name, so rules-only triage gets the same
+    follow-up budget as the agent (RC1-644). Deterministic: the first insufficient
+    finding, in rule order, whose named check has not been answered yet."""
+    if issued >= rounds:
+        return None
+    for f in result.findings:
+        if f.status != rules.INSUFFICIENT:
+            continue
+        for cid in f.followups:
+            if cid in registry.followups() and ev.followup(cid) is None:
+                return {"schema": "cik.followup-request/1",
+                        "request_id": "fr-" + secrets.token_hex(6), "check_id": cid,
+                        "parent_bundle": ev.primary.digest,
+                        "reason": f"Rule {f.rule}: {f.hypothesis}"[:600],
+                        "discriminates": "; ".join(f.does_not_establish)[:600],
+                        "issued_at": datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ")}
+    return None
+
+
 def triage(primary: Path, fingerprint: str, *, supplements: list[Path] | None = None,
            mode: str = "rules", store: CaseStore | None = None, client: Any = None,
            budget: agent_mod.Budget | None = None, post=telemetry.post) -> dict[str, Any]:
@@ -86,6 +108,13 @@ def triage(primary: Path, fingerprint: str, *, supplements: list[Path] | None = 
                                     **result.as_dict()})
     trace = telemetry.Trace(run_id, mode, n, registry.digest())
     r = None
+    budget = budget or agent_mod.Budget()
+    if mode == "rules":
+        req = rules_followup(ev, result, len(issued), budget.followup_rounds)
+        if req:
+            case.write(f"requests/{req['request_id']}.json", req)
+            r = agent_mod.RoundResult(outcome="awaiting_followup",
+                                      stop_reason="followup_requested", followup_request=req)
     if mode == "agent":
         if client is None:
             client = anthropic.Anthropic()
