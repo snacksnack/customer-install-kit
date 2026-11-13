@@ -591,3 +591,34 @@ def test_cli_run_prints_metadata_only(tmp_path, capsys):
 def test_cli_refuses_a_wrong_fingerprint(tmp_path, capsys):
     assert cli.main(["--case-store", str(tmp_path), "run", str(fixture(FAMILY1)),
                      "--fingerprint", "sha256:" + "0" * 64]) == cli.EXIT_REFUSED
+
+
+# -- rules-only triage requests the follow-up its own finding names (RC1-644) -------------
+
+def test_rules_mode_requests_the_named_followup_then_concludes(tmp_path):
+    store = CaseStore(tmp_path / "cases")
+    parent_path = forge(tmp_path, FAMILY1, name="parent")
+    parent = archive.inspect(parent_path, FORGED_FP)
+    first = engine.triage(parent_path, FORGED_FP, store=store, post=lambda p: None)
+    assert (first["outcome"], first["followup_requested"]) == ("awaiting_followup", "FUP-DB-PRIV")
+    assert first["rules_outcome"] == "insufficient_evidence" and first["cost_usd"] == 0
+    sup = supplement(tmp_path, parent, "FUP-DB-PRIV", {
+        "check_id": "FUP-DB-PRIV", "connected": True, "connect_class": None,
+        "grants": grant_rows(missing=("review_audit INSERT",))},
+        request_id=first["followup_request_id"])
+    second = engine.triage(parent_path, FORGED_FP, supplements=[sup], store=store,
+                           post=lambda p: None)
+    assert second["round"] == 2 and second["outcome"] == "supported_diagnosis"
+    assert second["stop_reason"] == "rules_only"
+
+
+def test_rules_mode_requests_nothing_without_an_open_question(tmp_path):
+    rec = engine.triage(fixture(HEALTHY), FP, store=CaseStore(tmp_path / "c"), post=lambda p: None)
+    assert rec["stop_reason"] == "rules_only" and not rec.get("followup_requested")
+
+
+def test_rules_followups_share_the_agent_round_bound():
+    ev = facts.Evidence(inspected(FAMILY1), [])
+    result = rules.run(ev)
+    assert engine.rules_followup(ev, result, 0, 2)["check_id"] == "FUP-DB-PRIV"
+    assert engine.rules_followup(ev, result, 2, 2) is None
