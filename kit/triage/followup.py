@@ -93,6 +93,11 @@ def _grant_rows() -> list[tuple[str, str, bool]]:
     return rows
 
 
+_TABLE_PRIV = ("SELECT (SELECT has_table_privilege(c.oid, %(priv)s) FROM pg_class c"
+               " JOIN pg_namespace n ON n.oid = c.relnamespace"
+               " WHERE c.relname = %(obj)s AND n.nspname = %(nsp)s)")
+
+
 def db_privileges(url: str, connect: Callable[..., Any]) -> dict[str, Any]:
     """The app role's grants, read with its own credential. Read-only catalog
     functions on ESP's own object names; no row of any table is read."""
@@ -102,15 +107,19 @@ def db_privileges(url: str, connect: Callable[..., Any]) -> dict[str, Any]:
     except psycopg.Error as exc:
         return out | {"connected": False, "connect_class": _classify(exc), "grants": []}
     grants = []
+    rows = _grant_rows()
+    nsp = next((o.split(" ", 1)[1] for o, _, _ in rows if o.startswith("schema ")), "public")
     with conn:
-        for obj, priv, expected in _grant_rows():
+        for obj, priv, expected in rows:
             if obj == "database":
                 q, args = "SELECT has_database_privilege(current_database(), %s)", (priv,)
             elif obj.startswith("schema "):
                 q, args = "SELECT has_schema_privilege(%s, %s)", (obj.split(" ", 1)[1], priv)
             else:
-                q, args = ("SELECT CASE WHEN to_regclass(%s) IS NULL THEN NULL "
-                           "ELSE has_table_privilege(%s, %s) END", (obj, obj, priv))
+                # By OID from the catalog, not by name: a name lookup (to_regclass)
+                # needs USAGE on the schema, so with USAGE revoked every table
+                # looked missing (RC1-644 case F1-2). NULL: no such table.
+                q, args = _TABLE_PRIV, {"obj": obj, "nsp": nsp, "priv": priv}
             granted = conn.execute(q, args).fetchone()[0]
             grants.append({"object": obj, "privilege": priv, "expected": expected,
                            "granted": granted, "object_exists": granted is not None})

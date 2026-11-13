@@ -279,8 +279,10 @@ class FakeConn:
 
     def execute(self, q, args):
         self.queries.append(q)
-        assert re.match(r"^SELECT (has_|CASE WHEN to_regclass)", q)  # catalog reads only
-        name = f"{args[0]} {args[-1]}" if len(args) == 3 else None
+        assert re.match(r"^SELECT (has_|\(SELECT has_table_privilege\(c\.oid)", q)  # catalog only
+        if isinstance(args, dict):
+            assert "to_regclass" not in q and args["nsp"] == "public"
+        name = f"{args['obj']} {args['priv']}" if isinstance(args, dict) else None
         return SimpleNamespace(fetchone=lambda: (name != self.revoked,))
 
 
