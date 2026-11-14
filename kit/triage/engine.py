@@ -8,12 +8,15 @@ fingerprint, received out of band. Nothing else: no customer credential, no
 evaluator label, no live system. A supplemental bundle is accepted only if it
 answers a follow-up request this case actually issued.
 
-Rules-only and agent-assisted results are recorded separately in every round
-(`rules_outcome` and `outcome`), so the agent's contribution is measured
-against the deterministic baseline on the same evidence.
+A case is (primary bundle, mode): rules-only and agent-assisted triage of the
+same bundle keep separate rounds and follow-up requests (RC1-652), and a
+supplement answers only a request issued in its own case. Every round also
+records the rules result (`rules_outcome`) beside its `outcome`, so the agent's
+contribution is measured against the deterministic baseline on the same evidence.
 """
 
 import secrets
+import sys
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
@@ -84,10 +87,11 @@ def triage(primary: Path, fingerprint: str, *, supplements: list[Path] | None = 
            budget: agent_mod.Budget | None = None, post=telemetry.post) -> dict[str, Any]:
     if mode not in MODES:
         raise ValueError(f"mode must be one of {MODES}")
+    telemetry.check_config(mode)  # before any bundle is read or model called (RC1-651)
     store = store or CaseStore()
     ins = archive.inspect(primary, fingerprint)
     sups = [archive.inspect(p, fingerprint) for p in supplements or []]
-    case = store.case(ins.digest)
+    case = store.case(ins.digest, mode)
     issued = {r["request_id"]: r for r in case.requests()}
     for s in sups:
         fu = s.manifest.get("followup") or {}
@@ -100,7 +104,7 @@ def triage(primary: Path, fingerprint: str, *, supplements: list[Path] | None = 
     n = case.next_round()
     rd = f"rounds/{n:02d}"
     run_id = "tr-" + secrets.token_hex(8)
-    case.write("case.json", {"case_id": case.id, "primary_bundle": ins.digest,
+    case.write("case.json", {"case_id": case.id, "mode": mode, "primary_bundle": ins.digest,
                              "primary_bundle_id": ins.manifest.get("bundle_id"),
                              "install_id": ins.manifest.get("install_id"),
                              "fingerprint": ins.fingerprint})
@@ -136,7 +140,13 @@ def triage(primary: Path, fingerprint: str, *, supplements: list[Path] | None = 
                      **{f"findings_{s}": statuses.count(s) for s in agent_mod.STATUSES},
                      **{k: v for k, v in (rec.get("usage") or {}).items()}},
                  (r.error_type if r else "none"))
-    rec["telemetry_status"] = post(trace.payload())
+    try:
+        rec["telemetry_status"] = post(trace.payload())
+    except telemetry.TelemetryRefused as exc:
+        # Fail closed for telemetry (nothing sent), never for the round (RC1-651).
+        rec["telemetry_status"] = "refused"
+        print(f"warning: telemetry refused, nothing sent ({exc}); the round is recorded",
+              file=sys.stderr)
     case.write(f"{rd}/result.json", {
         **rec, "rules": result.as_dict(),
         "diagnosis": r.diagnosis if r else None,

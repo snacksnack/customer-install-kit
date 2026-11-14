@@ -17,7 +17,7 @@ import sys
 from pathlib import Path
 
 from kit.bundle.archive import BundleRefused
-from kit.triage import engine, registry
+from kit.triage import engine, registry, telemetry
 from kit.triage.casestore import CaseStore
 
 EXIT_KIT_ERROR, EXIT_REFUSED = 3, 4
@@ -100,6 +100,9 @@ def main(argv: list[str] | None = None) -> int:
     except BundleRefused as exc:
         print(f"REFUSED: {exc}", file=sys.stderr)
         return EXIT_REFUSED
+    except telemetry.TelemetryRefused as exc:
+        print(f"error: {exc}", file=sys.stderr)
+        return EXIT_KIT_ERROR
     except (OSError, ValueError, KeyError) as exc:
         print(f"error: {type(exc).__name__}: {exc}", file=sys.stderr)
         return EXIT_KIT_ERROR
