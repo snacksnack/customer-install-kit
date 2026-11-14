@@ -30,3 +30,23 @@ This procedure is public when this commit is pushed, which is before the pulse e
 - Only the drawn family becomes the held-out evaluation family. The other two stay reserved: they are not used for development or evaluation, and they remain unseen by the registry.
 - The author designed all three candidates (step 3 of the protocol). The draw removes the author from the *choice* among them, not from their design. Results are reported that way.
 - If the drawn family turns out to be infeasible or too costly to run at the case count the evaluation needs, the gap is reported. Any author-selected substitute is published as the narrower claim (protocol step 4), never as the draw.
+
+## 4. Result
+
+Drawn on 2026-11-14 at 00:02Z with `python -m kit.evaluation.draw`, then re-checked offline from the saved pulses.
+
+| | |
+|---|---|
+| Pulse | [chain 2, pulse 2026639](https://beacon.nist.gov/beacon/2.0/chain/2/pulse/2026639), `timeStamp` 2026-11-14T00:00:00.000Z |
+| Previous pulse | 2026638 (proves 2026639 is the first at or after the committed time) |
+| `outputValue` | `8B73B35F0F3ECEC26F8B3A468ED346CDF10921273AFA40C2BAE99C0577E3588AA1BE34E9720C1567CC3B4CDEF35F0F26B11044177C3F89FAC2E105EDC414E6CD` |
+| Index | 1 of (H1, H2, H3) |
+| **Drawn family** | **H2** |
+| Freeze commit / registry | `95890a4` / `sha256:4700a810…a7f0` |
+
+Raw pulses: `tests/fixtures/beacon/pulse-2026639.json` and `pulse-2026638.json`. To check the result yourself:
+
+    python -m kit.evaluation.draw --pulse tests/fixtures/beacon/pulse-2026639.json \
+        --previous tests/fixtures/beacon/pulse-2026638.json
+
+H1 and H3 stay reserved and unused.
