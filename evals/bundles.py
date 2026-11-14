@@ -13,6 +13,7 @@ import base64
 import copy
 import hashlib
 import secrets
+from datetime import timedelta
 from pathlib import Path
 from typing import Any
 
@@ -59,6 +60,9 @@ def forge(tmp: Path, base: str, edit=None, *, manifest_edit=None,
                         "sha256": collect.sha256_hex(data), "bytes": len(data),
                         "counts": {}, "dropped": {}, "purpose": "eval"})
     manifest["sources"] = entries
+    # The Phase 4 fixtures carry the collector's --case label, which names the
+    # scenario. The agent can read the manifest, so the label never goes in.
+    manifest.pop("case", None)
     if manifest_edit:
         manifest_edit(manifest)
     (out / collect.PUBLIC_KEY_FILE).write_text(collect.file_text({
@@ -73,10 +77,19 @@ def supplement(tmp: Path, parent: archive.Inspected, check_id: str, data: dict[s
     """A follow-up answer for `request_id`, as the customer would send it."""
     source = facts.FOLLOWUP_SOURCES[check_id]
 
+    # Collected a few minutes after the parent, with its own identity. An
+    # earlier version kept the healthy bundle's id and finish time, and the
+    # agent rightly refused to trust a supplement whose timing contradicted
+    # itself.
+    done = facts.parse_time(parent.manifest["collected_finished_at"])
+    start, finish = done + timedelta(minutes=4), done + timedelta(minutes=4, seconds=6)
+
     def m(man):
         man["followup"] = {"check_id": check_id, "request_id": request_id,
                            "parent_bundle": parent.digest}
-        man["collected_started_at"] = "2026-11-13T02:00:00Z"
+        man["bundle_id"] = f"diag-{start:%Y%m%dT%H%M%SZ}-{secrets.token_hex(3)}"
+        man["collected_started_at"] = f"{start:%Y-%m-%dT%H:%M:%SZ}"
+        man["collected_finished_at"] = f"{finish:%Y-%m-%dT%H:%M:%SZ}"
         man["sources"] = [e for e in man["sources"] if e["source"] == source]
     return forge(tmp, HEALTHY, lambda f: f.clear(), manifest_edit=m, name=name,
                  extra_files={f"files/{source}.json": {"schema": collect.FILE_SCHEMA,
