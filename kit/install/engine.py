@@ -43,7 +43,7 @@ from kit.install import release as rel
 from kit.install import secrets_file
 from kit.install.config import InstallConfig
 from kit.install.esp_image import EspImage
-from kit.install.fly import Fly
+from kit.install.fly import Fly, FlyError
 from kit.model import Context
 from kit.probes import PROBES, ProbeEnv
 
@@ -60,6 +60,9 @@ HEALTH_ATTEMPTS = 30
 HEALTH_INTERVAL_S = 2.0
 DEPLOY_SETTLE_ATTEMPTS = 20
 DEPLOY_SETTLE_INTERVAL_S = 3.0
+# A redeployed machine passes /healthz before `fly ssh` can reach it.
+SSH_ATTEMPTS = 10
+SSH_INTERVAL_S = 6.0
 
 STEPS = (
     "verify_release",
@@ -129,12 +132,20 @@ def runtime_bundle() -> str:
     return base64.b64encode(buf.getvalue()).decode()
 
 
-def _runtime_preflight(fly: Fly, app: str, profile: str) -> dict[str, Any]:
+def _runtime_preflight(fly: Fly, app: str, profile: str,
+                       sleep: Callable[[float], None] = time.sleep) -> dict[str, Any]:
     unpack = (
         "rm -rf /tmp/cik && mkdir -p /tmp/cik && cd /tmp/cik"
         f" && echo {runtime_bundle()} | base64 -d | tar xzf -"
     )
-    fly.run("ssh", "console", "-a", app, "-C", f"sh -c '{unpack}'")
+    for attempt in range(1, SSH_ATTEMPTS + 1):
+        try:
+            fly.run("ssh", "console", "-a", app, "-C", f"sh -c '{unpack}'")
+            break
+        except FlyError:
+            if attempt == SSH_ATTEMPTS:
+                raise
+            sleep(SSH_INTERVAL_S)
     run = (
         "cd /tmp/cik && PYTHONPATH=/tmp/cik /app/.venv/bin/python -m kit preflight"
         f" --context runtime --profile {profile} --json"
@@ -493,6 +504,9 @@ class Installer:
 
     def _step_deploy(self) -> None:
         action = self._deploy(self.release)
+        # The pushed secrets are live now. Record them here, not only at the end,
+        # so a later step's failure doesn't make this push look like outside drift.
+        self._record_fly_digests()
         self.record["release"] = self.release.to_json()
         rec.step(self.record, "deploy", "done", action=action,
                  config_sha256=_digest(self._fly_toml().read_text()))
