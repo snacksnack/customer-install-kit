@@ -424,11 +424,21 @@ def test_agent_diagnosis_with_a_bad_citation_is_refused_then_accepted(tmp_path):
     (agent.Budget(model_calls=3), "budget_model_calls"),
     (agent.Budget(tool_calls=2), "budget_tool_calls"),
     (agent.Budget(usd=0.01), "budget_usd"),
+    (agent.Budget(seconds=0.0), "budget_seconds"),
 ])
 def test_agent_budgets_end_the_round(tmp_path, budget, stop):
     rec, client, _, _ = run_agent(tmp_path, fixture(FAMILY2), FP, [], budget=budget)
     assert rec["outcome"] == "budget_exhausted" and rec["stop_reason"] == stop
     assert len(client.sent) <= 3
+
+
+def test_each_model_call_is_capped_by_the_round_clock(tmp_path):
+    _, client, _, _ = run_agent(tmp_path, fixture(FAMILY2), FP, [],
+                                budget=agent.Budget(model_calls=2, seconds=120.0))
+    assert client.sent and all(0 < kw["timeout"] <= 120.0 for kw in client.sent)
+    _, client, _, _ = run_agent(tmp_path / "b", fixture(FAMILY2), FP, [],
+                                budget=agent.Budget(model_calls=2))
+    assert all(kw["timeout"] == 300.0 for kw in client.sent)
 
 
 def test_followup_rounds_are_bounded(tmp_path):

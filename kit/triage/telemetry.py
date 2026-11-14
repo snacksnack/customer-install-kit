@@ -47,7 +47,7 @@ TAG_VALUES: dict[str, re.Pattern] = {
                           r"|budget_exhausted|awaiting_followup)$"),
     "stop_reason": re.compile(r"^(end_turn|tool_use|max_tokens|refusal|pause_turn|diagnosis"
                               r"|followup_requested|budget_model_calls|budget_tool_calls"
-                              r"|budget_usd|no_tool_call|api_error|rules_only)$"),
+                              r"|budget_usd|budget_seconds|no_tool_call|api_error|rules_only)$"),
     "round": re.compile(r"^[0-9]{1,2}$"),
     "followup": re.compile(r"^(none|FUP-[A-Z-]{2,24})$"),
     "error": re.compile(r"^[01]$"),
