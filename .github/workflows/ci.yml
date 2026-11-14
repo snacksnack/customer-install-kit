@@ -21,6 +21,8 @@ jobs:
           --health-timeout 5s --health-retries 10
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # tests/test_draw.py recomputes the Phase 6 freeze from git
       - uses: astral-sh/setup-uv@v4
       - run: uv sync --frozen --group evals
       - run: uv run ruff check .

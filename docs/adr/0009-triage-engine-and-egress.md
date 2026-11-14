@@ -29,6 +29,8 @@ The rules handle the one thing the bundles made unavoidable: **the error-event f
 
 A test fails if any registry file mentions a term specific to the reserved held-out candidates (TLS and trust stores, proxies, credential scope, connection exhaustion). **The freeze is the registry digest at this PR's merge commit.** Any later change to a registry file changes the digest, and a changed digest cannot be compared with held-out results produced before it.
 
+**Post-freeze change (RC1-645, 2026-11-14).** `knowledge.toml` v2 adds `review_audit SELECT` to what `audit.append` needs: ESP reads the chain tip before the insert. The RC1-645 demo found it; the agent left an `audit.append` refusal unexplained because v1 said the missing SELECT could not cause it. Phase 6 results stay bound to the frozen digest `sha256:4700a810…`, which `tests/test_draw.py` recomputes from the freeze commit.
+
 **The agent can read, request one allowlisted check, or conclude.** `kit/triage/agent.py` is a manual tool loop on `claude-opus-5-5`, with these settings:
 
 - effort `high`,

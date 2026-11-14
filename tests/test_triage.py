@@ -634,3 +634,9 @@ def test_rules_followups_share_the_agent_round_bound():
     result = rules.run(ev)
     assert engine.rules_followup(ev, result, 0, 2)["check_id"] == "FUP-DB-PRIV"
     assert engine.rules_followup(ev, result, 2, 2) is None
+
+
+def test_audit_append_needs_the_chain_tip_select():
+    # ESP reads the chain tip before its INSERT (pgstore.record_within); v1 omitted it.
+    needs = registry.knowledge()["operations"]["audit.append"]["needs"]
+    assert {"review_audit SELECT", "review_audit INSERT"} <= set(needs)
