@@ -12,7 +12,7 @@ All four run on `cik-esp-p3` (ESP v0.1.4), the same customer environment as the 
 |---|---|---|---|
 | P1 | `ESP_BREVO_API_KEY` is unset on the app (`fly secrets unset`) | runtime | ENV-001 fail `missing`, evidence `missing = ["ESP_BREVO_API_KEY"]`; runtime exit 1 |
 | P2 | the operator's owner URL carries a wrong password; the database is not touched | operator | DB-001 fail `refused`, `error_class = "auth"`; DB-002 and DB-003 unknown `blocked` by DB-001; operator exit 1 |
-| P3 | `ESP_ERROR_EVENTS_PATH` points at `/data/logs/`, a directory that does not exist (ESP opens the path without creating directories) | runtime | RT-004 fail `missing`, `exists = false`; runtime exit **0**, because RT-004 is advisory |
+| P3 | `ESP_ERROR_EVENTS_PATH` points at `/data/logs/`, a directory that does not exist (ESP opens the path without creating directories) | runtime | RT-004 fail `missing`, `exists = false`; runtime exit **0**, because RT-004 is advisory (exit 1 after RT-004 was made required; see Findings) |
 | P4 | the data volume is remounted read-only, so the sink cannot be written | runtime | RT-003 and RT-004 fail `refused`, `errno = 30` (EROFS); runtime exit 1 |
 
 ## Protocol
@@ -45,7 +45,7 @@ Each case is scored on five properties.
 |---|---|---|---|---|---|---|
 | P1 | yes | yes (runtime 1) | yes | yes | yes | ENV-001 fail `missing`, `missing = ["ESP_BREVO_API_KEY"]` |
 | P2 | yes | yes (operator 1) | yes | yes | yes | DB-001 fail `refused`, `error_class = "auth"`, `sqlstate = null`; DB-002 and DB-003 unknown, blocked by DB-001 |
-| P3 | yes | yes (runtime 0) | yes | yes | yes | RT-004 fail `missing`, `path = "/data/logs"`, `exists = false`; installation is not blocked |
+| P3 | yes | yes (runtime 1) | yes | yes | yes | RT-004 fail `missing`, `path = "/data/logs"`, `exists = false`; installation is blocked |
 | P4 | yes | yes (runtime 1) | yes | yes | yes | RT-003 and RT-004 fail `refused`, `errno = 30` |
 
 ### What the first P4 runs found
@@ -57,7 +57,7 @@ Both P4 failures were the same fault. Neither came from the fault being undetect
 
 ### Findings
 
-- **RT-004 is advisory, and P3 shows what that costs.** Preflight reports the broken sink, and installation goes ahead. ESP still writes every event to stderr, which is why the check was made advisory. But Phase 4 (ADR 0008) found that work run over `fly ssh` (the executor that `kit verify` drives) reaches only the file sink. With a broken sink, those events are on no channel the bundle collects. Recommendation: make RT-004 required whenever `ESP_ERROR_EVENTS_PATH` is set. This is a registry change, so it is left for a decision and not made here.
+- **RT-004 was advisory, and P3 showed what that cost (now required).** Preflight reported the broken sink, and installation went ahead (runtime exit 0). ESP writes every event to stderr too, which is why the check was advisory. But Phase 4 (ADR 0008) found that work run over `fly ssh` (the executor that `kit verify` drives) reaches only the file sink. With a broken sink, those events are on no channel the bundle collects. RT-004 is now required. When `ESP_ERROR_EVENTS_PATH` is unset, the check is not applicable and never blocks. P3's expected exit changed from 0 to 1 in a separate evaluator commit, and P3 was run again: exit 1, all five properties pass. The advisory-era run is kept evaluator-side.
 - **A wrong owner password has no SQLSTATE** (`sqlstate = null`). The `auth` class comes from libpq's message pattern (ADR 0005), and that held against Neon.
 - **The `report.md` claim that RT-003 "catches all three" storage faults was wrong for the read-only case** until `dcc8226`. A correction note has been added there.
 

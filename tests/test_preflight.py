@@ -198,3 +198,14 @@ def test_cli_refuses_to_print_a_leaked_secret(monkeypatch, capsys):
     captured = capsys.readouterr()
     assert status == preflight.EXIT_KIT_ERROR
     assert "xkeysib-planted-secret" not in captured.out + captured.err
+
+
+def test_a_broken_sink_blocks_but_an_unset_one_does_not():
+    """RT-004 is required (RC1-644): `kit verify` executor events reach only the
+    file sink. Unset, it is not applicable and never blocks."""
+    sink = {"path": "/data/logs", "exists": False, "writable": None, "errno": None,
+            "free_bytes": None, "minimum_free_bytes": 1048576}
+    broken = lambda c, e: ProbeResult(Outcome.FAIL, Reason.MISSING, sink)  # noqa: E731
+    unset = lambda c, e: ProbeResult(Outcome.NOT_APPLICABLE, Reason.NOT_CONFIGURED, {})  # noqa: E731
+    assert runtime(probes_with(RT_004=broken)).exit_status == preflight.EXIT_FAILED
+    assert runtime(probes_with(RT_004=unset)).exit_status == preflight.EXIT_OK
