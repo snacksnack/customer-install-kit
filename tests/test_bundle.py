@@ -301,6 +301,18 @@ def test_contract_events_are_kept_and_others_dropped_and_counted():
                      "unsupported_version": 1, "bad_op": 1, "malformed_json": 1}
 
 
+def test_camel_case_routes_from_esp_are_kept():
+    """ESP's mask allows a plain word in either case; Brevo's campaign paths are
+    camel case. They were dropped as bad_route before (RC1-644 H2-2)."""
+    recs = [ev(op="destination.request", error_class="http", status=403,
+               provider_code="permission_denied", route=r)
+            for r in ("POST /emailCampaigns", "PUT /emailCampaigns/{id}", "GET /v3/emailCampaigns")]
+    kept, drops = events.from_lines([json.dumps(r) for r in recs], limit=10)
+    assert kept == recs and not drops
+    bad = ev(op="destination.request", error_class="http", route="GET /emailCampaigns/12345")
+    assert events.from_lines([json.dumps(bad)], limit=10)[1] == {"bad_route": 1}
+
+
 def test_v1_rejects_the_v2_only_field():
     rec_v1 = {**FAMILY_EVENTS["startup_db_auth"], "v": 1}
     assert events.check(rec_v1) == "unknown_field"
