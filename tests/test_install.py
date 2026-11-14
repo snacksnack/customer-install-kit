@@ -23,7 +23,9 @@ from kit.install.engine import (
     Installer,
     InstallError,
     RecoveryRequired,
+    _runtime_preflight,
 )
+from kit.install.fly import Fly, FlyError, Result
 
 OWNER_URL = "postgresql://owner:owner-password-123@db.customer.example/esp"
 DIGESTS = {"0.1.1": "sha256:" + "1" * 64, "0.1.2": "sha256:" + "2" * 64}
@@ -414,3 +416,39 @@ def test_history_counts_completed_installs_not_started_ones(world):
     r = read_record(world)
     assert [(h["action"], h["from"], h["to"]) for h in r["history"]] == [("install", None, "0.1.1")]
     assert r["installed_version"] == "0.1.1"
+
+
+def test_secret_change_that_fails_after_deploy_is_not_drift_on_retry(world):
+    """A failure after the deploy (e.g. the runtime preflight) must not leave the
+    kit's own push looking like an outside change, or every retry redeploys."""
+    world["build"]().install()
+    secrets_file.update(world["dir"] / ".env.cik", {"ESP_REVIEW_PASSWORD": "rotated-by-operator"})
+    with pytest.raises(InjectedFailure):
+        world["build"]().install(fail_after="deploy")
+    calls = len(world["fly"].calls)
+    assert world["build"]().install() == 0
+    assert world["fly"].calls[calls:] == []
+    assert not any("outside the kit" in s for s in world["said"])
+
+
+def test_runtime_preflight_waits_for_ssh_after_a_deploy():
+    report = '{"exit_status": 0, "observations": []}'
+    attempts = []
+
+    def runner(args, stdin):
+        attempts.append(args)
+        if len(attempts) <= 2:
+            return Result(1, "", "Error: ssh: no machines are reachable yet")
+        return Result(0, report if "preflight" in " ".join(args) else "", "")
+
+    slept = []
+    out = _runtime_preflight(Fly(runner), "acme-esp", "fly-neon-brevo", sleep=slept.append)
+    assert out["exit_status"] == 0 and len(slept) == 2
+
+
+def test_runtime_preflight_gives_up_when_ssh_never_comes_up():
+    def runner(args, stdin):
+        return Result(1, "", "Error: ssh: no machines are reachable")
+
+    with pytest.raises(FlyError):
+        _runtime_preflight(Fly(runner), "acme-esp", "fly-neon-brevo", sleep=lambda s: None)
