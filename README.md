@@ -15,7 +15,7 @@ Jira: epic RC1-594, phases RC1-638..647.
 
 ## Status
 
-Phases 0A (RC1-638), 0B (RC1-646), 1 (RC1-639) and 2 (RC1-640) done. Phase 3 (RC1-641) done: customer-side conformance and signed reports. Phase 4 (RC1-642) done: diagnostic bundles. Phase 5 (RC1-643): rules-first triage, a bounded agent with allowlisted follow-up checks, and a sealed runtime.
+Phases 0A (RC1-638), 0B (RC1-646), 1 (RC1-639) and 2 (RC1-640) done. Phase 3 (RC1-641) done: customer-side conformance and signed reports. Phase 4 (RC1-642) done: diagnostic bundles. Phase 5 (RC1-643): rules-first triage, a bounded agent with allowlisted follow-up checks, and a sealed runtime. Phase 6 (RC1-644): the sealed rules-versus-agent evaluation has run; [results report](docs/phase6/report.md). The preflight coverage suite and the Datadog and CI integration are still open.
 
 ## Preflight
 
@@ -70,6 +70,7 @@ Exit 0 ok, 3 kit error, 4 refused. Nothing is uploaded. Customer guide: [docs/bu
 - `docs/requirements.md` — generated from the registry.
 - `docs/risks.md` — risk log, reviewed at each phase exit.
 - `docs/phase0/`, `docs/phase0b/` — Phase 0 working documents and evidence.
+- `docs/phase6/` — evaluation protocol, held-out draw, results report and the revealed sealed files.
 - `spike/` — Phase 0 live customer-org artifacts.
 
 ## Triage (Phase 5)
@@ -82,3 +83,9 @@ docker compose -f triage/compose.yaml run --rm triage run /in/FILE --fingerprint
 ```
 
 Guide: [docs/triage.md](docs/triage.md). Decision: [ADR 0009](docs/adr/0009-triage-engine-and-egress.md).
+
+## Evaluation (Phase 6)
+
+**Results: [docs/phase6/report.md](docs/phase6/report.md).** Rules versus agent triage on 13 sealed fault and control cases, including a held-out family chosen by public randomness after the registry was frozen.
+
+Protocol and scoring: [docs/phase6/cases.md](docs/phase6/cases.md). Held-out draw: [docs/phase6/heldout-draw.md](docs/phase6/heldout-draw.md). Sealed expectations and the grading prompt, revealed after scoring: [docs/phase6/sealed/](docs/phase6/sealed/).
