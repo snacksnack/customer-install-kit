@@ -255,9 +255,11 @@ def diagnosis_case(case: Case, base: str, check: str, data: dict[str, Any],
     key = "grants" if "grants" in data else "probes"
     source = {"FUP-DB-PRIV": "fup_db_priv", "FUP-DEST-AUTH": "fup_dest_auth"}[check]
     want = _decisive_index(data, pick)
-    cited = set()
+    cited, pointers = set(), set()
     for f in _supported(final):
         for c in f.get("citations") or []:
+            if f"/files/{source}.json#" in c:
+                pointers.add(c.split("#", 1)[1])  # a schema path, never a value
             m = re.search(rf"/files/{source}\.json#/data/{key}/(\d+)", c)
             if m:
                 cited.add(int(m.group(1)))
@@ -270,7 +272,8 @@ def diagnosis_case(case: Case, base: str, check: str, data: dict[str, Any],
            answered is not None and final.record.get("outcome") == "supported_diagnosis",
            f"final outcome {final.record.get('outcome')} after {len(rounds)} round(s)"),
         _c("cites-the-decisive-row", bool(cited & want),
-           f"decisive rows {sorted(want)}; cited {sorted(cited)}"),
+           f"decisive rows {sorted(want)}; cited {sorted(cited)}; "
+           f"answer pointers {sorted(pointers)[:8]}"),
     ]
     return CaseResult(case_id=case.id, characteristics=chars, usage=_usage(rounds, latency),
                       observations=_observations(rounds, rules_rounds))

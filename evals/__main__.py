@@ -26,12 +26,17 @@ import urllib.error
 import urllib.request
 from datetime import UTC, datetime
 
+import anthropic
 from agent_evals.runner import UnknownCase, exit_code, record_run, select_cases
 
 from evals import subject
 
 SERIES = "https://api.{site}/api/v2/series"
 GAUGE = 3  # the v2 series `type` is an int enum
+# The SDK default is 600 s a request with 2 retries, so one stalled call can
+# hold a sweep for half an hour (seen 2026-11-14). The kit itself has no
+# wall-clock budget; that is a kit finding, not fixed here.
+MODEL_TIMEOUT_S = 300.0
 
 
 def gauges(results) -> list[tuple[str, float, list[str]]]:
@@ -100,11 +105,12 @@ def main(argv: list[str] | None = None) -> int:
     print(f"{len(cases)} case(s) against {version.subject} {version.code_version}, "
           f"{version.model}, {version.prompt_version}; billed: {billed or 'none'}; "
           f"tracing {'on' if os.environ.get('DD_API_KEY') else 'off'} (metadata-only).\n")
+    client = anthropic.Anthropic(timeout=MODEL_TIMEOUT_S, max_retries=2) if billed else None
     started = datetime.now(UTC)
     results = []
     try:
         for case in cases:
-            results.append(subject.run(case))
+            results.append(subject.run(case, client))
     finally:
         subject.STATE.close()
     if not args.no_record:
