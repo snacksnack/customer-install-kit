@@ -6,6 +6,8 @@ Status: proposed (RC1-643)
 
 **Inputs are exported bundles and the customer's key fingerprint. Nothing else.** `python -m kit.triage run` takes a bundle archive, any supplemental (follow-up) archives, and the report-key fingerprint the customer sent out of band. Every archive goes through `kit.bundle.archive.inspect` (ADR 0008's hostile-input gate) before anything reads it. There is no customer credential, no evaluator label, and no live system anywhere in triage. A supplement is accepted only if it answers a follow-up request this case actually issued, for the bundle it names.
 
+**A case is (primary bundle, mode)** (RC1-652, 2026-11-14). The case id is `case-<12 hex of the bundle digest>-<rules|agent>`, so rules-only and agent-assisted triage of one bundle never share rounds or follow-up requests. Before this, the id was the bundle digest alone: in the RC1-645 demo an agent run after a rules run on the same store became round 3, inherited the rules run's issued request, and stopped at `insufficient_evidence` without asking its own. No property here depended on one case per bundle; the request binding above is what keeps supplements honest, and it now binds a supplement to one mode's request. Case directories written before the change keep their old names and stay readable with `show` and `record`.
+
 **Rules first.** `kit/triage/facts.py` derives typed facts from fixed JSON paths, and each fact keeps the `cik-ev:` references it came from. `kit/triage/rules.py` turns facts into findings:
 
 | status | meaning |
@@ -69,6 +71,8 @@ Bounds per round are 10 model calls, 24 tool calls, $1.50 and 600 seconds of wal
 | case store (vendor triage host, owner-only files) | everything: transcript, evidence read, diagnosis, requests | nowhere; it is the controlled investigation record |
 
 **Telemetry is built, not scrubbed.** ddtrace's anthropic integration is not used: it captures prompts, completions, tool inputs and outputs, and exception messages. `kit/triage/telemetry.py` builds each span from allowlisted fields and posts to the LLM Obs intake directly, with a `version:` tag, which the intake needs to index root-span tags. `validate()` refuses any key, tag, or value outside the allowlist, and `post()` sends nothing that has not passed it. No span has input or output; errors carry a type from a fixed set, never a message. CI output and eval exports get the same metadata-only record (`python -m kit.triage record`), and the `run` command prints only that record.
+
+**A telemetry refusal is fail-closed for telemetry, never for the round** (RC1-651, 2026-11-14). `check_config()` builds and validates a placeholder payload at startup, so a tag source outside the allowlist (a `DD_ENV` other than `prod|dev|evals|dry-run|ci`) stops `run` with exit 3 before any bundle is read or model is called. If a finished payload still fails `validate()`, nothing is posted, the round's `result.json` is written with `telemetry_status: "refused"`, and a warning goes to stderr. Before this, the refusal raised after the model calls were paid for and the transcript and request were written, but before `result.json`, leaving a half-written round that the next run numbered itself after.
 
 **The runtime can reach the model and nothing else.** The network layer is built by `triage/compose.yaml`:
 

@@ -6,10 +6,13 @@ follow-up requests and diagnoses. They live here, on the vendor's triage
 host, in owner-only files, and nowhere else. They are not telemetry, not CI
 output, and not eval exports; those get the metadata-only record instead.
 
+A case is one (primary bundle, mode) pair (RC1-652): rules and agent triage of
+the same bundle never share rounds or follow-up requests.
+
 Layout under the store root (default ~/.cik-triage/cases, or CIK_CASE_STORE):
 
-    case-<12 hex of the primary bundle digest>/
-        case.json                    inputs: bundle digests, fingerprint
+    case-<12 hex of the primary bundle digest>-<rules|agent>/
+        case.json                    mode, inputs: bundle digests, fingerprint
         requests/fr-<id>.json        follow-up requests issued
         rounds/NN/rules.json         deterministic result for this round's evidence
         rounds/NN/transcript.jsonl   agent messages and tool calls (agent mode)
@@ -83,8 +86,13 @@ class CaseStore:
         env = os.environ.get("CIK_CASE_STORE")
         self.root = (root or (Path(env) if env else DEFAULT_ROOT)).expanduser()
 
-    def case(self, primary_digest: str) -> Case:
-        path = self.root / f"case-{primary_digest.removeprefix('sha256:')[:12]}"
+    def case(self, primary_digest: str, mode: str) -> Case:
+        if mode not in ("rules", "agent"):
+            raise ValueError(f"unknown triage mode {mode!r}")
+        path = self.root / f"case-{primary_digest.removeprefix('sha256:')[:12]}-{mode}"
+        meta = path / "case.json"
+        if meta.exists() and json.loads(meta.read_text()).get("mode") not in (None, mode):
+            raise ValueError(f"{path.name} belongs to another mode")
         _mkdirs(path)
         self.root.chmod(0o700)
         return Case(path)

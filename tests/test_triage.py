@@ -368,7 +368,7 @@ def run_agent(tmp_path, bundle_path, fp, turns, budget=None, requests=None):
     captured = []
     store = CaseStore(tmp_path / "cases")
     if requests:
-        case = store.case(archive.inspect(bundle_path, fp).digest)
+        case = store.case(archive.inspect(bundle_path, fp).digest, "agent")
         for r in requests:
             case.write(f"requests/{r['request_id']}.json", r)
     client = FakeClient(turns)
@@ -640,3 +640,89 @@ def test_audit_append_needs_the_chain_tip_select():
     # ESP reads the chain tip before its INSERT (pgstore.record_within); v1 omitted it.
     needs = registry.knowledge()["operations"]["audit.append"]["needs"]
     assert {"review_audit SELECT", "review_audit INSERT"} <= set(needs)
+
+
+# -- a telemetry refusal never crashes a round (RC1-651) ---------------------------------
+
+def test_a_bad_dd_env_is_refused_before_any_bundle_or_model_call(tmp_path, monkeypatch):
+    monkeypatch.setenv("DD_ENV", "staging")
+    client = FakeClient([])
+    store = CaseStore(tmp_path / "cases")
+    with pytest.raises(telemetry.TelemetryRefused, match="DD_ENV"):
+        engine.triage(fixture(FAMILY2), FP, mode="agent", store=store, client=client,
+                      post=lambda p: 202)
+    assert client.sent == [] and not store.root.exists()
+    assert cli.main(["--case-store", str(tmp_path / "cli"), "run", str(fixture(FAMILY1)),
+                     "--fingerprint", FP]) == cli.EXIT_KIT_ERROR
+    assert not (tmp_path / "cli").exists()
+
+
+def test_a_payload_refused_at_the_end_still_leaves_a_complete_round(tmp_path, monkeypatch,
+                                                                     capsys):
+    monkeypatch.delenv("DD_API_KEY", raising=False)
+    monkeypatch.setenv("CIK_TELEMETRY_CAPTURE", str(tmp_path / "cap.jsonl"))
+
+    def tainted_post(p):
+        # a finished payload that fails the allowlist, sent through the real post()
+        p["data"]["attributes"]["tags"].append("statement:hello")
+        return telemetry.post(p)
+    store2 = CaseStore(tmp_path / "real")
+    rec = engine.triage(fixture(FAMILY2), FP, mode="agent", store=store2,
+                        client=FakeClient([]), budget=agent.Budget(model_calls=1),
+                        post=tainted_post)
+    assert rec["telemetry_status"] == "refused"
+    res = store2.get(rec["case_id"]).read(f"rounds/{rec['round']:02d}/result.json")
+    assert res["telemetry_status"] == "refused" and res["outcome"] == rec["outcome"]
+    assert not (tmp_path / "cap.jsonl").exists()  # validate refused before capture or POST
+    assert "telemetry refused" in capsys.readouterr().err
+
+
+# -- a case is (bundle, mode) (RC1-652) ----------------------------------------------------
+
+def test_rules_then_agent_on_one_bundle_are_independent_cases(tmp_path):
+    store = CaseStore(tmp_path / "cases")
+    parent_path = forge(tmp_path, FAMILY1, name="parent")
+    rules_rec = engine.triage(parent_path, FORGED_FP, store=store, post=lambda p: None)
+    agent_rec = engine.triage(parent_path, FORGED_FP, mode="agent", store=store,
+                              client=FakeClient([[block_tool(
+                                  "request_followup", {"check_id": "FUP-DB-PRIV",
+                                                       "reason": "why",
+                                                       "discriminates": "what"}, 1)]]),
+                              post=lambda p: None)
+    assert rules_rec["case_id"] != agent_rec["case_id"]
+    assert rules_rec["case_id"].endswith("-rules") and agent_rec["case_id"].endswith("-agent")
+    assert rules_rec["round"] == agent_rec["round"] == 1
+    assert rules_rec["followup_requested"] == agent_rec["followup_requested"] == "FUP-DB-PRIV"
+    assert rules_rec["followup_request_id"] != agent_rec["followup_request_id"]
+    for rec in (rules_rec, agent_rec):
+        reqs = store.get(rec["case_id"]).requests()
+        assert [r["request_id"] for r in reqs] == [rec["followup_request_id"]]
+        assert store.get(rec["case_id"]).read("case.json")["mode"] == rec["mode"]
+
+
+def test_a_supplement_for_one_modes_request_is_refused_by_the_other(tmp_path):
+    store = CaseStore(tmp_path / "cases")
+    parent_path = forge(tmp_path, FAMILY1, name="parent")
+    parent = archive.inspect(parent_path, FORGED_FP)
+    first = engine.triage(parent_path, FORGED_FP, store=store, post=lambda p: None)
+    sup = supplement(tmp_path, parent, "FUP-DB-PRIV", {
+        "check_id": "FUP-DB-PRIV", "connected": True, "connect_class": None,
+        "grants": grant_rows(missing=("review_audit INSERT",))},
+        request_id=first["followup_request_id"])
+    client = FakeClient([])
+    with pytest.raises(BundleRefused, match="answers no follow-up request"):
+        engine.triage(parent_path, FORGED_FP, supplements=[sup], mode="agent", store=store,
+                      client=client, post=lambda p: None)
+    assert client.sent == []
+    # ... and is still accepted by the case that issued it
+    second = engine.triage(parent_path, FORGED_FP, supplements=[sup], store=store,
+                           post=lambda p: None)
+    assert second["round"] == 2 and second["outcome"] == "supported_diagnosis"
+
+
+def test_a_case_directory_refuses_another_mode(tmp_path):
+    store = CaseStore(tmp_path / "cases")
+    case = store.case("sha256:" + "a" * 64, "rules")
+    case.write("case.json", {"mode": "agent"})
+    with pytest.raises(ValueError, match="another mode"):
+        store.case("sha256:" + "a" * 64, "rules")

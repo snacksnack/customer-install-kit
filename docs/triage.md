@@ -16,6 +16,10 @@ uv run python -m kit.triage record <case-id>      # metadata only, for eval expo
 uv run python -m kit.triage freeze                # registry digest
 ```
 
+A case is one bundle in one mode: `case-<12 hex of the bundle digest>-rules` or `-agent`. Running both modes on the same bundle, as above, gives two independent cases, each with its own rounds and its own follow-up requests. A follow-up bundle the customer returns answers one request, so pass it with `--supplement` to the mode that issued that request; the other mode refuses it.
+
+`DD_ENV` must be one of `prod`, `dev`, `evals`, `dry-run` or `ci`. Any other value stops `run` with exit 3 before it reads the bundle or calls the model. If a finished round's telemetry still fails the allowlist, nothing is sent, the round is recorded anyway with `telemetry_status: "refused"`, and a warning is printed.
+
 `run` prints the metadata record only. The investigation record is in the case store (`~/.cik-triage/cases`, owner-only). It holds the agent's transcript, the evidence it read, and the diagnosis. In production, run it in the sealed runtime instead:
 
 ```sh

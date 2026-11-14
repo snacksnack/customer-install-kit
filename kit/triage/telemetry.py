@@ -13,8 +13,11 @@ from a fixed set), and no free text anywhere. The content-bearing channel is
 the Claude API itself, disclosed in ADR 0009; Datadog receives metadata.
 
 Decoration, never load-bearing: without DD_API_KEY, `post()` declines, and a
-failed POST is reported by status code only. Set CIK_TELEMETRY_CAPTURE to a
-file path to also append every outgoing payload there for inspection.
+failed POST is reported by status code only. A bad tag source is refused at
+startup by `check_config()`; a finished payload that still fails `validate()`
+is not sent, and the round is recorded with telemetry_status "refused". Set
+CIK_TELEMETRY_CAPTURE to a file path to also append every outgoing payload
+there for inspection.
 """
 
 import json
@@ -73,6 +76,22 @@ ID = re.compile(r"^[1-9][0-9]{0,19}$")
 
 class TelemetryRefused(Exception):
     """A payload carried something outside the allowlist; it is not sent."""
+
+
+def check_config(mode: str) -> None:
+    """Refuse a bad tag source (DD_ENV) at startup, before any bundle is read or any
+    model is called (RC1-651). Builds and validates a placeholder round's payload,
+    so every configured tag source passes through the same allowlist `post()` uses."""
+    if mode not in ("rules", "agent"):
+        return  # the engine rejects the mode itself
+    t = Trace("tr-" + "0" * 16, mode, 1, "sha256:" + "0" * 64)
+    t.finish("insufficient_evidence", "rules_only", None, [], {})
+    try:
+        validate(t.payload())
+    except TelemetryRefused as exc:
+        raise TelemetryRefused(
+            f"telemetry configuration refused ({exc}); DD_ENV must be one of "
+            "prod, dev, evals, dry-run, ci") from None
 
 
 def new_id() -> str:
