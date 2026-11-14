@@ -10,7 +10,7 @@
 | ✅ **No false alarms** | On healthy systems (2 controls), neither mode reported a fault. |
 | ❌ **New failure type** | Neither mode diagnosed the held-out family, a Brevo key that works but lacks a permission: **0 of 2**. Both saw the error and didn't recognize what it meant. |
 | 🛠️ **Kit bugs found** | 4, all fixed (PRs #12, #13, #17, #18). One of them hid the evidence in a third held-out case, so that case is not scored. |
-| ✅ **Trustworthy test** | Rules results reproduced exactly, nothing leaked to the engines, and every system was restored. |
+| ✅ **Trustworthy test** | Rules results reproduced exactly, nothing leaked to the engines, no planted canary reached Datadog, CI or eval exports, and every system was restored. |
 
 ## Scorecard
 
@@ -164,7 +164,21 @@ Rules mode was replayed on r1's exact inputs (bundle and supplements) for every 
 <details>
 <summary><b>Leakage</b></summary>
 
-Every bundle, live follow-up supplement and triage output was scanned for case ids, harness and sealed-file names, and six-word runs from every sealed `truth` and `evidence_note`: 0 hits on all 13 cases. A planted positive control was caught. The canary check across Datadog payloads, CI output and eval exports has not run yet (see open items).
+Every bundle, live follow-up supplement and triage output was scanned for case ids, harness and sealed-file names, and six-word runs from every sealed `truth` and `evidence_note`: 0 hits on all 13 cases. A planted positive control was caught.
+
+**Canaries (run 2026-11-14, 0 hits).** The kit plants 18 secret- and PII-shaped values on purpose: the eval subject's three per-run canaries (matched by their fixed prefixes, so every run that ever planted them is covered) and 15 fixed values in the triage and bundle tests. The evaluator's `python -m harness canaries` searched for all 18, plus base64 forms of 4, on every surface below. Each surface was read in full and has a positive control that shows the search could have found a hit.
+
+| surface | N scanned | control | hits |
+|---|---|---|---|
+| Datadog LLM Obs, every `ml_app:cik-triage` span (export API, full JSON) | 1,723 spans (320 from eval runs that planted canaries, 1,403 dev) | another app's span exports with its input | 0 |
+| Datadog metrics, every tag on every `cik.evals.*` metric | 6 metrics, 25 tag values | tags read | 0 |
+| Datadog logs, free-text search of all indexes, 30 days | 1,408 events, 14 queries | wildcard control matched 121 | 0 |
+| CI, every log of every `ci` run | 48 runs, 291 log files | all 48 show the test step, 4 the free eval's canary case | 0 |
+| Eval store, every `cik-triage` record | 1 record | record carries the canary check | 0 |
+| Published trend page | 1 file | page lists `cik-triage` | 0 |
+| Scheduled-sweep logs | 2 files | read | 0 |
+
+Coverage limits: Datadog log search is free text, so it covers log messages, not attributes; the kit sends no logs. The canaries reach CI output only if a test fails and prints them, and none ever did. The eval store holds one record because the other eval runs used `--no-record`; their spans are in the 320 above. The weekly sweep has not run the subject yet (first run 2026-11-16). This is 18 values on 7 surfaces, not proof that nothing can leak.
 
 </details>
 
@@ -192,7 +206,7 @@ Every bundle, live follow-up supplement and triage output was scanned for case i
 - **H2-2's sealed note** describes an event the kit's validator dropped (finding 2). The case cannot be amended after triage, so it is graded as written and reported separately.
 - **Held-out design:** the author designed all three candidate families before the draw and the H2 cases after it. The draw removed the author from the choice of family, not from case design. The H2 mechanics were probed on the workstation with the restricted keys before sealing.
 - **Preflight coverage suite:** run on 2026-11-14 and scored separately, never part of these results: 4 of 4 caught ([preflight-coverage.md](preflight-coverage.md)).
-- **Not yet run:** the canary check across Datadog, CI and eval exports. It is open in RC1-644.
+- **Canary check** across Datadog, CI and eval exports ran on 2026-11-14, after the cases, not with each run as the protocol planned. 0 hits (see Leakage).
 
 </details>
 
