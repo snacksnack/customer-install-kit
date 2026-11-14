@@ -15,7 +15,7 @@ Jira: epic RC1-594, phases RC1-638..647.
 
 ## Status
 
-Phases 0A (RC1-638), 0B (RC1-646), 1 (RC1-639) and 2 (RC1-640) done. Phase 3 (RC1-641) done: customer-side conformance and signed reports. Phase 4 (RC1-642) done: diagnostic bundles. Phase 5 (RC1-643): rules-first triage, a bounded agent with allowlisted follow-up checks, and a sealed runtime. Phase 6 (RC1-644): the sealed rules-versus-agent evaluation has run; [results report](docs/phase6/report.md). The preflight coverage suite and the Datadog and CI integration are still open.
+Phases 0A (RC1-638), 0B (RC1-646), 1 (RC1-639) and 2 (RC1-640) done. Phase 3 (RC1-641) done: customer-side conformance and signed reports. Phase 4 (RC1-642) done: diagnostic bundles. Phase 5 (RC1-643): rules-first triage, a bounded agent with allowlisted follow-up checks, and a sealed runtime. Phase 6 (RC1-644): the sealed rules-versus-agent evaluation has run; [results report](docs/phase6/report.md). The [preflight coverage suite](docs/phase6/preflight-coverage.md) has run: 4 of 4 caught, after two preflight fixes it found. The Datadog and CI integration are still open.
 
 ## Preflight
 

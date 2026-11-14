@@ -178,7 +178,7 @@ Every bundle, live follow-up supplement and triage output was scanned for case i
 5. **`kit install` looped on its own push** (fixed in PR #17). A redeployed machine passes `/healthz` before `fly ssh` can reach it, so the runtime preflight failed. Fly digests were recorded only at the end of a successful install, so every retry saw the kit's own push as outside drift and redeployed into the same race.
 6. **Error events accumulate across incidents.** The event sink is cumulative, and old `unauthorized` events from earlier Brevo faults stayed in later bundles. Rules mode blamed a credential on F1-3 using them, and the H2 bundles held 11 old `unauthorized` events beside the current `permission_denied`, and H2-2's only `permission_denied` was H2-1's. The bundle does not mark which events predate the current failure.
 7. **Brevo applies dashboard changes unevenly for minutes.** After the key was deactivated (F2-1), probes returned mixed 200, 401 and 403 for several minutes. The two F2-1 misses (rules r1, agent a2) are the two runs whose live follow-ups caught that state. Reactivation took about 8 minutes to settle. The harness now waits for three consistent probes after any operator change. F2-2 ran with that in place.
-8. **Storage faults don't fail ESP 0.1.4 on this install.** `/data` holds only the error-event file, so full or read-only storage only stops ESP recording errors. F3-1..3 were withdrawn before triage (amendment v2). Runtime preflight (RT-003) catches all three when it runs.
+8. **Storage faults don't fail ESP 0.1.4 on this install.** `/data` holds only the error-event file, so full or read-only storage only stops ESP recording errors. F3-1..3 were withdrawn before triage (amendment v2). Runtime preflight (RT-003) catches all three when it runs. *Correction (2026-11-14): that was wrong for the read-only case. RT-003 returned `probe_error` on a read-only `/data` until kit `dcc8226`; see `preflight-coverage.md`.*
 9. **Release history went unused.** On F2-3, every run named an IP restriction. The one distinguishing clue was a release with an unchanged image just before the failures (a secret change), and no run used it.
 10. **The sealed F1-2 note was wrong about the error code.** It predicted SQLSTATE 42501. A `USAGE` revoke produces 42P01 (relation not found). The note could not be amended after F1-2 was triaged. The grader received the note as written, and F1-2's grades stand as measured.
 
@@ -191,7 +191,8 @@ Every bundle, live follow-up supplement and triage output was scanned for case i
 - **Harness changes during the suite:** the API-error invalidation, the Brevo settle wait (after F2-1) and the `kit install` retry (during H2) were added mid-suite. None changes what triage sees or how it is graded.
 - **H2-2's sealed note** describes an event the kit's validator dropped (finding 2). The case cannot be amended after triage, so it is graded as written and reported separately.
 - **Held-out design:** the author designed all three candidate families before the draw and the H2 cases after it. The draw removed the author from the choice of family, not from case design. The H2 mechanics were probed on the workstation with the restricted keys before sealing.
-- **Not yet run:** the preflight coverage suite (scored separately, never part of these results) and the canary check across Datadog, CI and eval exports. Both are open in RC1-644.
+- **Preflight coverage suite:** run on 2026-11-14 and scored separately, never part of these results: 4 of 4 caught ([preflight-coverage.md](preflight-coverage.md)).
+- **Not yet run:** the canary check across Datadog, CI and eval exports. It is open in RC1-644.
 
 </details>
 
