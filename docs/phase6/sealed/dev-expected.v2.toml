@@ -1,0 +1,184 @@
+# RC1-644 sealed expectations: development-family suite. EVALUATOR-SIDE ONLY.
+#
+# The sha256 of this file is published in customer-install-kit
+# docs/phase6/cases.md before any case in it is triaged. It is revealed
+# unchanged after scoring. Amendments are allowed only for a case that has not
+# been triaged yet; each one is a new version of this file, with the reason in
+# [amendments] and the new hash published before that case runs.
+#
+# Grading categories for each run's final answer (after all follow-up rounds):
+#   correct_supported      a supported finding about a current fault whose cause matches `truth`
+#   appropriate_abstention no supported current-fault finding, and `abstention_ok` is true;
+#                          for fault cases it must name the true cause among its candidates
+#                          or request a follow-up that discriminates it
+#   missed                 no supported current-fault finding, and `abstention_ok` is false
+#   unsupported            any supported current-fault finding whose cause is in `unsupported`,
+#                          or is not the true cause (controls: any supported current fault)
+# A run can be correct_supported and unsupported at once (two findings); it is
+# then reported as unsupported. `exclusive = false` means the allowed evidence
+# cannot rule out the named confound: a correct_supported answer there is also
+# reported as an overclaim.
+
+seal_version = 2
+salt = "48d1a4062fd1c29436b5994d5fe9c62b"
+registry_digest = "sha256:4700a81003e099163a84acf6eb407aaefe0745b310f15a8d80d23030d335a7f0"
+
+[cases.F1-1]
+family = 1
+tags = []
+truth = "esp_app lacks SELECT on review_audit. audit.append reads the chain tip (SELECT ... ORDER BY seq DESC LIMIT 1) before its INSERT, so sign-in fails with 42501; audit.read fails too."
+cause = "db_privilege: review_audit SELECT"
+correct_remedy = "Restore SELECT on review_audit to esp_app (GRANT SELECT ON review_audit TO esp_app), then kit verify."
+unsupported = ["review_audit INSERT missing", "schema USAGE missing", "credential rejected", "any destination or storage cause"]
+abstention_ok = false
+evidence_note = "FUP-DB-PRIV shows exactly review_audit SELECT missing. The first bundle alone cannot say which privilege."
+exclusive = true
+
+[cases.F1-2]
+family = 1
+tags = []
+truth = "esp_app lacks USAGE on schema public. Every statement on ESP's tables fails with 42501 although the table grants remain."
+cause = "db_privilege: schema public USAGE"
+correct_remedy = "GRANT USAGE ON SCHEMA public TO esp_app, then kit verify."
+unsupported = ["a table privilege missing (the table grants are intact)", "credential rejected", "any destination or storage cause"]
+abstention_ok = false
+evidence_note = "FUP-DB-PRIV shows schema USAGE false with every table grant true."
+exclusive = true
+
+[cases.F1-3]
+family = 1
+tags = ["evidence_limited"]
+truth = "CONNECT on the database is revoked from esp_app and PUBLIC. Existing pooled sessions keep working; after the machine restarts, every new app connection is refused with 'permission denied for database', which ESP classifies as connect_class=database."
+cause = "db_privilege: database CONNECT"
+correct_remedy = "GRANT CONNECT ON DATABASE <db> TO esp_app, then kit verify."
+unsupported = ["credential rejected / password", "network, DNS, TLS or pool cause", "a schema or table privilege missing", "any destination or storage cause"]
+abstention_ok = true
+evidence_note = "FUP-DB-PRIV cannot read the matrix: it fails to connect with connect_class=database. A supported CONNECT diagnosis counts only if it cites the database-class connect failures and evidence the database exists (for example the owner's successful checks). Otherwise an abstention that names a database-level refusal is appropriate."
+exclusive = false
+confound = "the database named in the URL no longer exists"
+
+[cases.F2-1]
+family = 2
+tags = ["needs_dashboard"]
+truth = "The Brevo API key is deactivated in the dashboard after preflight passes. Every Brevo call with it is refused 401 from everywhere."
+cause = "destination: key rejected"
+correct_remedy = "Reactivate the key or create a new one, push it with kit install, then kit verify (re-run until it passes, because propagation can lag)."
+unsupported = ["source-address restriction", "route or method refusal", "quota", "any database or storage cause"]
+abstention_ok = false
+evidence_note = "FUP-DEST-AUTH answers 401 from both vantages on both routes."
+exclusive = true
+
+[cases.F2-2]
+family = 2
+tags = ["needs_dashboard", "confusable_with:F2-3"]
+truth = "Brevo's authorized-IP restriction is turned on with only the operator workstation's address listed. The machine's calls are refused; the workstation's succeed."
+cause = "destination: source-address restriction"
+correct_remedy = "Add the app's egress address to Brevo's authorized IPs, or turn the restriction off, then kit verify."
+unsupported = ["key rejected everywhere", "the app holds a different key than the workstation", "any database or storage cause"]
+abstention_ok = true
+evidence_note = "FUP-DEST-AUTH: workstation 200, machine 401. The probe keeps the status and Brevo's error code only, and a key mismatch between the two vantages produces the same pattern."
+exclusive = false
+confound = "the machine holds a different key than the workstation (case F2-3)"
+
+[cases.F2-3]
+family = 2
+tags = ["confusable_with:F2-2"]
+truth = "The app's ESP_BREVO_API_KEY secret is replaced with a key Brevo does not recognize. The workstation's secrets file still holds the valid key. Setting the secret creates a new Fly release with the same image."
+cause = "destination: the app's key differs from the working key"
+correct_remedy = "Push the valid key to the app (kit install from the install's secrets file), then kit verify."
+unsupported = ["source-address restriction", "key rejected everywhere / key deactivated", "any database or storage cause"]
+abstention_ok = true
+evidence_note = "FUP-DEST-AUTH: workstation 200, machine 401, the same as F2-2. The only distinguishing evidence is the release history: a release with an unchanged image just before the failures began."
+exclusive = false
+confound = "a source-address restriction at the destination (case F2-2)"
+
+[cases.F3-1]
+family = 3
+withdrawn = "inodes exhausted: kit verify passed (run 20261113t180429-5eda)"
+tags = []
+truth = "The /data volume's inodes are exhausted by many small files outside ESP's own; blocks remain free. Writes fail with ENOSPC."
+cause = "storage: volume full (inodes)"
+correct_remedy = "Remove what fills /data (after review) or move it off; extending the volume also adds inodes. Then kit verify."
+unsupported = ["any database or destination cause", "volume read-only", "ESP's own files fill the volume"]
+abstention_ok = false
+evidence_note = "ENOSPC in the evidence and FUP-VOLUME inodes at 100% with free blocks. 'Volume full' without naming inodes is still correct_supported; claiming the blocks are full is not."
+exclusive = true
+
+[cases.F3-2]
+family = 3
+withdrawn = "/data read-only, EROFS confirmed: kit verify passed (run 20261113t180619-33cf)"
+tags = []
+truth = "The /data filesystem is remounted read-only while the app runs. Writes fail with EROFS."
+cause = "storage: volume read-only"
+correct_remedy = "Restart the machine (or remount read-write) after checking the volume, then kit verify."
+unsupported = ["volume full", "any database or destination cause"]
+abstention_ok = false
+evidence_note = "EROFS reaches stderr (the file sink on /data cannot record it), and FUP-VOLUME shows free space, which rules out 'full'. That is sufficient evidence whether or not the support knowledge lists EROFS, so a final abstention is missed. FUP-VOLUME does not report mount flags: if the case proof shows no EROFS in the first bundle, this case is amended to abstention_ok = true before it runs."
+exclusive = true
+
+[cases.F3-3]
+family = 3
+withdrawn = "blocks at 0 available during the migration: executor and reconcile exited 0 (run 20261113t180804-20a6)"
+tags = ["evidence_limited"]
+truth = "/data blocks are filled by a non-ESP file during the migration. Afterwards the platform log buffer is rolled past the ENOSPC lines by ordinary request logs, so the first bundle holds no errno."
+cause = "storage: volume full (blocks)"
+correct_remedy = "Free space or extend the volume after reviewing what fills it, then kit verify."
+unsupported = ["any database or destination cause", "volume read-only"]
+abstention_ok = false
+evidence_note = "First bundle: the conformance failure and a silent file sink, with no errno. FUP-VOLUME shows 100% blocks used, almost all outside ESP's files. Abstaining in round 1 is fine, but the final answer is scored: FUP-VOLUME is allowed and settles it, so a final abstention is missed."
+exclusive = true
+
+[cases.A1]
+family = "compound"
+tags = ["ambiguous", "two_faults"]
+truth = "Two current faults at once: esp_app lacks USAGE on schema public, AND /data is read-only."
+cause = "db_privilege: schema public USAGE + storage: volume read-only"
+correct_remedy = "Both: GRANT USAGE, and restore the volume to read-write; then kit verify."
+unsupported = ["a table privilege missing", "volume full", "credential rejected", "any destination cause"]
+abstention_ok = true
+evidence_note = "correct_supported needs both causes supported. One cause supported with the other left insufficient is graded appropriate_abstention for the second and reported as partial."
+exclusive = true
+
+[cases.A2]
+family = 1
+tags = ["ambiguous", "stale"]
+truth = "esp_app's USAGE on schema public is revoked, kit verify runs and fails, then USAGE is restored BEFORE the bundle is collected. No fault is current at collection."
+cause = "none current (past: schema USAGE)"
+correct_remedy = "None. At most, confirm with kit verify."
+unsupported = ["any current-fault supported diagnosis, including schema USAGE missing now"]
+abstention_ok = true
+evidence_note = "The bundle shows 42501 after the current release and a failed conformance run, with no later passing run. FUP-DB-PRIV shows every grant present. 'Resolved' or 'no current fault' is correct_supported for this case."
+exclusive = true
+
+[cases.C1]
+family = "control"
+tags = ["clean_install"]
+truth = "A fresh kit install of the same release on a new app and Neon branch; kit verify passes. No fault, and an empty event history."
+cause = "none"
+correct_remedy = "None."
+unsupported = ["any supported current-fault finding"]
+abstention_ok = true
+evidence_note = "insufficient_evidence with no current fault is the expected outcome."
+exclusive = true
+
+[cases.C2]
+family = "control"
+tags = ["clean_after_recovery"]
+truth = "p3 after recovery from the preceding cases; kit verify passes. The cumulative event file holds past faults, all before a passing conformance run."
+cause = "none"
+correct_remedy = "None."
+unsupported = ["any supported current-fault finding (every past fault is resolved)"]
+abstention_ok = true
+evidence_note = "Findings marked resolved are correct. Any supported current fault is unsupported."
+exclusive = true
+
+[amendments]
+# v2, 2026-11-13, before any of these cases was triaged:
+# F3-1, F3-2 and F3-3 are withdrawn. Each fault was injected and confirmed on
+# the volume, and none produced a customer-visible failure: on this install
+# /data holds only ESP's error-event file (ESP_ERROR_EVENTS_PATH), and ESP
+# 0.1.4's migration needs nothing on the volume. A storage fault there only
+# stops ESP recording errors. Every other entry is unchanged. A1 stays: its
+# schema USAGE revoke fails the run, and the read-only volume keeps the
+# errors out of the file sink.
+withdrawn = ["F3-1", "F3-2", "F3-3"]
