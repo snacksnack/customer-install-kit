@@ -22,7 +22,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: astral-sh/setup-uv@v4
-      - run: uv sync --frozen
+      - run: uv sync --frozen --group evals
       - run: uv run ruff check .
       - run: uv run python -m kit registry
       - run: uv run python -m kit requirements --check
@@ -31,6 +31,9 @@ jobs:
       - run: uv run pytest
         env:
           CIK_TEST_PG_ADMIN_URL: postgresql://postgres:ci-only@localhost:5432/postgres
+      # RC1-644: the eval subject's free cases (isolation, metadata-only tracing
+      # with planted canaries). The billed cases run from the agent-evals sweep.
+      - run: uv run --group evals python -m evals --free --no-record
 
   # ADR 0002 / ADR 0009: the triage runtime's identity holds nothing and its
   # network reaches only the allowlisted hosts. Re-proven on every change.
