@@ -13,9 +13,9 @@ import stat
 import pytest
 
 from kit.install import config as cfg
+from kit.install import engine, secrets_file
 from kit.install import record as rec
 from kit.install import release as rel
-from kit.install import secrets_file
 from kit.install.engine import (
     STEPS,
     Deps,
@@ -291,6 +291,55 @@ def test_volume_created_inside_an_adopted_app_is_destroyed_by_id(world):
     world["build"]().teardown("acme-esp")
     assert world["fly"].created("destroy_volume") == [("destroy_volume", "vol_1")]
     assert not world["fly"].created("destroy_app")
+
+
+def edit_config(world, old, new):
+    path = world["dir"] / "install.toml"
+    path.write_text(path.read_text().replace(old, new))
+
+
+# RC1-653: the record decides ownership, so the config must not pick the target.
+@pytest.mark.parametrize("old,new", [('app = "acme-esp"', 'app = "unrelated-app"'),
+                                     ('fly_org = "acme-org"', 'fly_org = "other-org"'),
+                                     ('volume = "esp_data"', 'volume = "other_data"')])
+def test_teardown_refuses_a_config_that_no_longer_names_the_recorded_app(world, old, new):
+    world["build"]().install()
+    world["fly"].apps.add("unrelated-app")
+    edit_config(world, old, new)
+    confirm = "unrelated-app" if "unrelated" in new else "acme-esp"
+    with pytest.raises(InstallError, match="teardown refused: install.toml does not match"):
+        world["build"]().teardown(confirm)
+    assert not world["fly"].created("destroy_app")
+    assert not world["fly"].created("destroy_volume")
+    assert {"acme-esp", "unrelated-app"} <= world["fly"].apps
+    assert read_record(world)["state"] == rec.STATE_INSTALLED
+
+
+def test_rollback_and_install_refuse_a_config_that_names_another_app(world):
+    world["build"]().install()
+    edit_config(world, "0.1.1", "0.1.2")
+    world["build"]().install()
+    deploys = len(world["fly"].created("deploy"))
+    edit_config(world, 'app = "acme-esp"', 'app = "unrelated-app"')
+    with pytest.raises(InstallError, match="rollback refused"):
+        world["build"]().rollback("0.1.1")
+    with pytest.raises(InstallError, match="install refused"):
+        world["build"]().install()
+    assert len(world["fly"].created("deploy")) == deploys
+
+
+def test_dropping_the_app_role_refuses_an_owner_url_for_another_database(world, monkeypatch):
+    world["build"]().install()
+    dropped = []
+    monkeypatch.setattr(engine, "drop_role", lambda url, role: dropped.append(url) or "dropped")
+    secrets_file.update(world["dir"] / ".env.cik", {
+        secrets_file.OWNER_URL: "postgresql://owner:owner-password-123@other.example/esp"})
+    with pytest.raises(InstallError, match="not the database install-record.json names"):
+        world["build"]().teardown("acme-esp", drop_app_role=True)
+    assert not dropped and not world["fly"].created("destroy_app")
+    secrets_file.update(world["dir"] / ".env.cik", {secrets_file.OWNER_URL: OWNER_URL})
+    assert world["build"]().teardown("acme-esp", drop_app_role=True) == 0
+    assert dropped == [OWNER_URL]
 
 
 def test_upgrade_then_compatible_rollback_redeploys_without_migrating(world):

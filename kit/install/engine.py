@@ -178,23 +178,35 @@ def _digest(value: str) -> str:
 APP_ROLE = "esp_app"
 
 
+# Postgres catalogs an owner can hold objects in, named for the refusal message.
+_OWNED_KINDS = {
+    "pg_class": "relation", "pg_proc": "function", "pg_namespace": "schema",
+    "pg_type": "type", "pg_largeobject_metadata": "large object", "pg_database": "database",
+}
+
+
 def drop_role(owner_url: str, role: str) -> str:
     """Drop the app role and its grants, never data. Since Postgres 16 the
     role's creator holds ADMIN on it but is not a member, so DROP OWNED is
     refused until the owner grants itself membership (seen live on Neon,
     RC1-640). DROP OWNED would also drop anything the role owns, so a role
-    that owns any object is refused outright: the app role should own
-    nothing, and if it does, that is data the kit will not delete."""
+    that owns any object of any kind, in any database (pg_shdepend records
+    ownership for all of them), is refused outright: the app role should own
+    nothing, and if it does, that is something the kit will not delete."""
     ident = sql.Identifier(role)
     with psycopg.connect(owner_url, autocommit=True) as conn:
         if not conn.execute("SELECT 1 FROM pg_roles WHERE rolname = %s", (role,)).fetchone():
             return "absent"
         owned = conn.execute(
-            "SELECT count(*) FROM pg_class c JOIN pg_roles r ON r.oid = c.relowner"
-            " WHERE r.rolname = %s", (role,)).fetchone()[0]
+            "SELECT d.classid::regclass::text, count(*) FROM pg_shdepend d"
+            " JOIN pg_roles r ON d.refclassid = 'pg_authid'::regclass AND d.refobjid = r.oid"
+            " WHERE r.rolname = %s AND d.deptype = 'o' GROUP BY 1 ORDER BY 1",
+            (role,)).fetchall()
         if owned:
-            raise InstallError(f"{role} owns {owned} relation(s); refusing to drop it (that"
-                               " would drop data). Reassign them, then re-run teardown.")
+            total = sum(n for _, n in owned)
+            kinds = ", ".join(f"{n} {_OWNED_KINDS.get(c, c)}" for c, n in owned)
+            raise InstallError(f"{role} owns {total} object(s) ({kinds}); refusing to drop it"
+                               " (that would drop them). Reassign them, then re-run teardown.")
         with conn.transaction():
             conn.execute(sql.SQL("GRANT {} TO CURRENT_USER").format(ident))
             conn.execute(sql.SQL("DROP OWNED BY {}").format(ident))
@@ -243,6 +255,38 @@ class Installer:
     def _image(self, release: rel.Release) -> EspImage:
         return self.deps.image(release.image_ref, self._owner_url())
 
+    def _require_recorded_identity(self, action: str) -> None:
+        """Before anything that deploys or destroys, install.toml must still
+        name what install-record.json says this install created or adopted.
+        The record decides ownership, so the config must not decide the target:
+        a config edited to another app would otherwise aim the action there."""
+        want = self.record["config"]
+        res = self.record["resources"]
+        differ = [k for k in ("fly_org", "app", "volume")
+                  if want.get(k) != getattr(self.cfg, k)]
+        app, vol = res.get("app"), res.get("volume")
+        if app and (app["name"], app["org"]) != (self.cfg.app, self.cfg.fly_org):
+            differ.append("recorded app")
+        if vol and vol["name"] != self.cfg.volume:
+            differ.append("recorded volume")
+        if differ:
+            raise InstallError(
+                f"{action} refused: install.toml does not match install-record.json"
+                f" ({', '.join(dict.fromkeys(differ))}). The record names"
+                f" {want.get('app')} in {want.get('fly_org')}; restore that config, or"
+                " start a new install from a new directory.")
+
+    def _require_recorded_database(self, action: str) -> None:
+        """The owner URL must point at the database the record names."""
+        db = self.record["resources"].get("database")
+        if not db:
+            raise InstallError(f"{action} refused: install-record.json names no database")
+        now = _db_identity(self._owner_url())
+        if (now["host"], now["database"]) != (db.get("host"), db.get("database")):
+            raise InstallError(
+                f"{action} refused: the owner URL points at {now['database']} on"
+                f" {now['host']}, not the database install-record.json names")
+
     def _set_secrets(self, updates: dict[str, str]) -> None:
         secrets_file.update(self.cfg.secrets_file, updates)
         self.secrets.update(updates)
@@ -263,8 +307,8 @@ class Installer:
                 "fly_org": self.cfg.fly_org, "app": self.cfg.app, "region": self.cfg.region,
                 "volume": self.cfg.volume, "public_url": self.cfg.public_url,
             })
-        elif self.record["config"]["app"] != self.cfg.app:
-            raise InstallError("install.toml names a different app than install-record.json")
+        else:
+            self._require_recorded_identity("install")
         self.record["state"] = rec.STATE_INSTALLING
         # The last version an install or rollback COMPLETED, not the one a
         # failed run started: `release` is written at verify time.
@@ -551,6 +595,7 @@ class Installer:
         allows it. Never runs migrate, never touches data or destinations."""
         if not self.record or self.record["state"] in (rec.STATE_INSTALLING, rec.STATE_TORN_DOWN):
             raise InstallError("rollback needs a completed install (see install-record.json)")
+        self._require_recorded_identity("rollback")
         current = self.record["release"]["version"]
         target = self._verify(version)
         cur_release = self._verify(current)
@@ -592,6 +637,9 @@ class Installer:
         customer's database and its data are always retained."""
         if not self.record:
             raise InstallError("no install-record.json here; nothing is known to be owned")
+        self._require_recorded_identity("teardown")
+        if drop_app_role:
+            self._require_recorded_database("teardown --drop-app-role")
         if confirm != self.cfg.app:
             raise InstallError(f"--confirm must name the app ({self.cfg.app})")
         res = self.record["resources"]

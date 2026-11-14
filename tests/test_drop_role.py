@@ -48,7 +48,30 @@ def test_a_role_that_owns_data_is_never_dropped(owner_url):
         conn.execute("GRANT CREATE ON SCHEMA public TO cik_td_app")
         conn.execute("CREATE TABLE app_owned (y int)")
         conn.execute("ALTER TABLE app_owned OWNER TO cik_td_app")
-    with pytest.raises(InstallError, match="owns 1 relation"):
+    with pytest.raises(InstallError, match=r"owns 1 object\(s\) \(1 relation\)"):
         drop_role(owner_url, "cik_td_app")
     with psycopg.connect(owner_url) as conn:
         assert conn.execute("SELECT to_regclass('app_owned')").fetchone()[0] is not None
+
+
+# RC1-653: DROP OWNED drops every kind of object, so the guard covers every kind.
+@pytest.mark.parametrize("create,kind", [
+    ("CREATE FUNCTION app_fn() RETURNS int LANGUAGE sql AS 'SELECT 1'", "function"),
+    ("CREATE SCHEMA app_schema", "schema"),
+    ("CREATE TYPE app_mood AS ENUM ('ok')", "type"),
+])
+def test_a_role_that_owns_any_object_is_never_dropped(owner_url, create, kind):
+    with psycopg.connect(owner_url, autocommit=True) as conn:
+        conn.execute("GRANT cik_td_app TO CURRENT_USER")
+        conn.execute("GRANT CREATE ON DATABASE cik_td TO cik_td_app")
+        conn.execute("GRANT CREATE ON SCHEMA public TO cik_td_app")
+        conn.execute("SET ROLE cik_td_app")
+        conn.execute(create)
+        conn.execute("RESET ROLE")
+    with pytest.raises(InstallError, match=rf"owns 1 object\(s\) \(1 {kind}\)"):
+        drop_role(owner_url, "cik_td_app")
+    with psycopg.connect(owner_url) as conn:
+        assert conn.execute("SELECT 1 FROM pg_roles WHERE rolname='cik_td_app'").fetchone()
+        assert conn.execute(
+            "SELECT count(*) FROM pg_proc WHERE proname='app_fn'").fetchone()[0] == (
+                1 if kind == "function" else 0)
