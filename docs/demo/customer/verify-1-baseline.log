@@ -1,0 +1,16 @@
+conformance run 20261114t152907-032c against cik-esp-p5
+  CNF-001  pass                   release_deployed (running_verified_digest)
+  CNF-002  pass                   health_endpoint (healthz_200)
+  CNF-010  pass                   anonymous_write_refused (refused_401)
+  CNF-011  pass                   wrong_password_refused (refused_401)
+  CNF-012  pass                   approver_sign_in (signed_in_password_unverified)
+  CNF-013  pass                   audit_append (sign_in_recorded)
+  CNF-020  pass                   fixture_built (fixture_built)
+  CNF-021  pass                   gate_refuses_draft (draft_refused)
+  CNF-023  pass                   approval_recorded (approved_through_gate)
+  CNF-022  pass                   gate_refuses_tampered (tampered_refused)
+  CNF-030  pass                   migration_executed (executed_and_converged)
+  CNF-031  pass                   destination_state (reconciled_and_read_back)
+  CNF-032  pass                   suppression_integrity (all_suppressed_non_subscribable)
+  CNF-040  pass                   fixture_cleanup (nothing_remains)
+conformance pass: ~/acme-install/conformance/20261114t152907-032c/report.signed.json

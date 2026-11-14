@@ -26,10 +26,10 @@ A release is trusted only if its manifest's Sigstore signature was made by:
 and the manifest names image repository `ghcr.io/snacksnack/esp-migration-agent`, platform `linux/amd64`, and an SBOM whose sha256 matches. The kit deploys by the digest in that manifest, never by tag. Check a release yourself at any time:
 
 ```sh
-uv run python -m kit.install verify-release 0.1.2
+uv run python -m kit.install verify-release 0.1.4
 # or, with cosign, the image directly:
 cosign verify ghcr.io/snacksnack/esp-migration-agent@sha256:<digest> \
-  --certificate-identity https://github.com/snacksnack/esp-migration-agent/.github/workflows/release.yml@refs/tags/v0.1.2 \
+  --certificate-identity https://github.com/snacksnack/esp-migration-agent/.github/workflows/release.yml@refs/tags/v0.1.4 \
   --certificate-oidc-issuer https://token.actions.githubusercontent.com
 ```
 
@@ -46,7 +46,7 @@ Make that private directory (`chmod 700`) with two files:
 ```toml
 [install]
 profile = "v1"
-release = "0.1.2"
+release = "0.1.4"
 fly_org = "acme-esp"
 app = "acme-esp"
 region = "iad"
@@ -71,13 +71,27 @@ The steps are: verify release, generate the report keypair, operator preflight, 
 
 Exit codes: 0 installed, 1 installed but a required runtime check is not passing (see `preflight-runtime.json`), 4 refused, 5 a step failed (re-run to resume), 3 kit error.
 
+Then prove the installed workflow works: `uv run python -m kit.verify run --config ~/acme-install/install.toml` runs a small migration of synthetic contacts inside your app and writes a signed report ([conformance.md](conformance.md)). A green `/healthz` is not that proof; the [demo](demo.md) shows a fault where health stayed 200 and conformance failed.
+
 **What stays on your workstation:** `.env.cik` (all secrets; the owner URL is never pushed to Fly), `report-key.pem` (the private half of the per-install report key), `.cik-pushed.sha256` (hashes used to skip unchanged secrets), `.cik-fly-secrets.json` (Fly's digests per secret name at the last install, so a secret changed with `fly secrets set` is noticed and re-staged from `.env.cik`). **What you can share:** `install-record.json`, `preflight-*.json`.
+
+## Upgrade
+
+An upgrade is a re-install with a newer `release`. The same converge steps run; only what differs changes.
+
+1. Verify the new release before touching anything: `uv run python -m kit.install verify-release 0.1.5`. Note its `db_schema` (version and the oldest schema its code runs on).
+2. If the schema version is higher than the one in `install-record.json` (`resources.database.schema`), the upgrade migrates your database forward, and migrations do not go back. Take a restore point first (Neon: create a branch of your database).
+3. Set `release = "0.1.5"` in `install.toml` and run `uv run python -m kit.install install --config ~/acme-install/install.toml`. The deploy is by digest; the record's `history` gains `upgrade 0.1.4 -> 0.1.5`.
+4. Run `uv run python -m kit.verify run`. The new signed report, not the deploy, is the evidence the upgrade worked.
+5. If conformance fails, either roll back (below; allowed only when the database schema is still one the old release runs on) or open a support case with a bundle ([support.md](support.md)).
+
+The install step (3) needs only an app deploy token. Evidence: an upgrade from 0.1.2 to 0.1.3 ran live under a deploy token ([ADR 0006](adr/0006-install-path.md), runs 5 and 6). Every signed release so far (0.1.2 to 0.1.4) has schema version 1, so the forward-migration path has run only in tests and as a simulated refusal (ADR 0006, runs 8 to 10), not as a live upgrade.
 
 ## Recovery
 
-Three separate things can change, and each recovers differently.
+Three separate things can change, and each recovers differently. For a fault in a running install (the app is up but something fails), start with [support.md](support.md): collect a bundle, get a diagnosis, apply the remedy yourself, then re-run conformance.
 
-1. **Application version.** `uv run python -m kit.install rollback --to 0.1.2` deploys an older verified release by digest. It never runs a migration and never touches data.
+1. **Application version.** `uv run python -m kit.install rollback --to 0.1.3` deploys an older verified release by digest. It never runs a migration and never touches data.
 2. **Database schema and data.** Migrations only go forward. Each release declares its schema version and the oldest schema its code can run on; the database records the same in `review_schema_version`. A rollback is refused (exit 4) when the database's schema is too new for the target. Refusal changes nothing, and the message gives the recovery path: either roll forward to a fixed release, or restore the database to a point before the migration (Neon: point-in-time branch restore) and then roll back. Install also refuses to apply an older release's schema over a newer one.
 3. **Destination side effects.** Contacts written to Brevo by a migration run are **not** reversed by a rollback, a restore, or a teardown. Reversing them is a destination-side operation (the execution journal lists every write).
 

@@ -1,0 +1,9 @@
+{
+  "check_id": "FUP-DB-PRIV",
+  "discriminates": "Which of the needed privileges is missing.; Whether it is still missing now.; Whether other grants are also gone.",
+  "issued_at": "2026-11-14T15:32:25Z",
+  "parent_bundle": "sha256:afd0d0713be99736989256359f09399b671349f24d8f9bc60e1d6aff7884c4a7",
+  "reason": "Rule TRI-DB-PRIV: The app role lacks a privilege an ESP operation needs.",
+  "request_id": "fr-dcc6a1dfdbbf",
+  "schema": "cik.followup-request/1"
+}

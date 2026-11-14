@@ -1,0 +1,12 @@
+case-afd0d0713be9 round 2  mode rules  outcome supported_diagnosis  (rules only: supported_diagnosis)  stop rules_only
+
+[supported] TRI-DB-PRIV The app role is missing grants ESP needs.
+  audit.append, audit.read was refused with 42501 3 times, 2026-11-14T15:30:02Z to 2026-11-14T15:30:02Z. The privilege matrix, read afterwards with the role's own credential, shows 1 expected grant(s) missing: review_audit SELECT. review_audit SELECT is what the refused operation needs.
+  supports: The missing grant explains the refusal.
+  supports: The grant was still missing when the follow-up ran.
+  does not establish: Who or what removed it.
+  cites cik-ev:sha256:afd0d0713be99736989256359f09399b671349f24d8f9bc60e1d6aff7884c4a7/files/file_sink.json#/data/error_events/2
+  cites cik-ev:sha256:afd0d0713be99736989256359f09399b671349f24d8f9bc60e1d6aff7884c4a7/files/file_sink.json#/data/error_events/1
+  cites cik-ev:sha256:afd0d0713be99736989256359f09399b671349f24d8f9bc60e1d6aff7884c4a7/files/file_sink.json#/data/error_events/0
+  cites cik-ev:sha256:cfec4fd60b6bd7348c040a46e12f82d6d1b52f280b18a18fd64e1ea35469d72d/files/fup_db_priv.json#/data/grants/2
+  proposed remedy (for customer review): Restore the app role's missing grants as the database owner. The exact statements come from the privilege matrix; ESP's grant set is the reference (review_ui/db_setup.py). Then run `python -m kit.verify run` to confirm. Statements: GRANT SELECT ON review_audit TO esp_app

@@ -1,0 +1,31 @@
+case-afd0d0713be9 round 2  mode agent  outcome insufficient_evidence  (rules only: supported_diagnosis)  stop diagnosis
+
+[supported]  The app role esp_app is missing review_audit SELECT, so audit.read is refused with 42501.
+  Two audit.read operations were refused with SQLSTATE 42501 at 2026-11-14T15:30:02Z (error_events/0 and /2). They were logged under release 0.1.4, the release the conformance run 20261114t152959-87a6 (15:29:59 to 15:30:38) verified as deployed. Fly release v1 was created at 15:28:23, before these events, so they come from the current release and are not left over from an earlier fault. Per support knowledge, 42501 means the session connected and authenticated but lacks a privilege, and audit.read needs schema public USAGE and review_audit SELECT. The privilege matrix the customer ran at 15:32:50 with the role's own credential (fup_db_priv) shows connected=true, schema public USAGE granted (grants/1), and review_audit SELECT expected but not granted (grants/2). Every other expected grant is present, and the must-not-have review_audit UPDATE/DELETE are not granted. So the missing SELECT explains the audit.read refusals, and it was still missing about two minutes after the conformance run.
+  supports: The audit.read 42501 refusals are explained by the missing review_audit SELECT grant.
+  supports: review_audit SELECT was still missing at 15:32:50Z, after the conformance run.
+  supports: The database credential works (connected=true), so this is not a credential fault.
+  does not establish: Who or what removed the grant.
+  does not establish: That restoring SELECT alone will make conformance pass. The audit.append refusal is not explained by this grant (see the separate finding).
+  does not establish: That the failing CNF-012 (approver_sign_in) is caused by this. The link is plausible because no session or SSO errors were logged, but the conformance report gives only 'sign_in_failed'.
+  cites cik-ev:sha256:afd0d0713be99736989256359f09399b671349f24d8f9bc60e1d6aff7884c4a7/files/file_sink.json#/data/error_events/0
+  cites cik-ev:sha256:afd0d0713be99736989256359f09399b671349f24d8f9bc60e1d6aff7884c4a7/files/file_sink.json#/data/error_events/2
+  cites cik-ev:sha256:5a1b25d3ba80632bf0bfa7d5879d4496d78ae4ef569ed3922b6d060e94b44214/files/fup_db_priv.json#/data/grants/1
+  cites cik-ev:sha256:5a1b25d3ba80632bf0bfa7d5879d4496d78ae4ef569ed3922b6d060e94b44214/files/fup_db_priv.json#/data/grants/2
+  cites cik-ev:sha256:5a1b25d3ba80632bf0bfa7d5879d4496d78ae4ef569ed3922b6d060e94b44214/files/fup_db_priv.json#/data/connected
+  cites cik-ev:sha256:afd0d0713be99736989256359f09399b671349f24d8f9bc60e1d6aff7884c4a7/files/conformance.json#/data/release
+  cites cik-ev:sha256:afd0d0713be99736989256359f09399b671349f24d8f9bc60e1d6aff7884c4a7/files/fly_releases.json#/data/0/CreatedAt
+  proposed remedy (for customer review): As the database owner, restore the missing grant shown in the privilege matrix: `GRANT SELECT ON review_audit TO esp_app;` (ESP's grant set in review_ui/db_setup.py is the reference). Do not grant UPDATE or DELETE on review_audit; those must stay absent. Then run `python -m kit.verify run` and check that CNF-012 and CNF-013 pass. If audit.append still fails, collect a new bundle.
+
+[insufficient]  audit.append is refused with 42501 because of a missing privilege.
+  One audit.append was refused with 42501 at 2026-11-14T15:30:02Z (error_events/1), under the current release 0.1.4 and inside the conformance window. Per support knowledge, audit.append needs schema public USAGE and review_audit INSERT, not SELECT. The privilege matrix at 15:32:50 shows both granted (grants/1 and grants/3). The only missing grant, review_audit SELECT, is not one audit.append needs. The rules engine's statement that 'review_audit SELECT is what the refused operation needs' is therefore true for audit.read but not for audit.append. Two explanations fit the evidence: INSERT (or another privilege) was missing at 15:30:02 and was granted again before 15:32:50, or audit.append also reads review_audit in a way the support knowledge does not record. The evidence cannot tell these apart. No conformance check has exercised audit.append since then (CNF-013 is insufficient_evidence, prerequisite_not_passed), so there is no evidence that the fault has stopped. Running FUP-DB-PRIV again would only show the current matrix, which already shows INSERT granted. It cannot tell us what was missing at 15:30:02, and the other allowlisted checks (destination auth, volume) do not apply to a 42501.
+  supports: An audit.append 42501 refusal occurred under the current release during the conformance run.
+  supports: The current privilege matrix shows every grant audit.append is documented to need.
+  does not establish: Which privilege audit.append was missing at 15:30:02Z.
+  does not establish: Whether grants were changed between 15:30:02Z and 15:32:50Z, or by whom.
+  does not establish: Whether the audit.append refusal is still happening now.
+  does not establish: Whether restoring review_audit SELECT will also clear the audit.append refusal.
+  cites cik-ev:sha256:afd0d0713be99736989256359f09399b671349f24d8f9bc60e1d6aff7884c4a7/files/file_sink.json#/data/error_events/1
+  cites cik-ev:sha256:5a1b25d3ba80632bf0bfa7d5879d4496d78ae4ef569ed3922b6d060e94b44214/files/fup_db_priv.json#/data/grants/1
+  cites cik-ev:sha256:5a1b25d3ba80632bf0bfa7d5879d4496d78ae4ef569ed3922b6d060e94b44214/files/fup_db_priv.json#/data/grants/3
+  cites cik-ev:sha256:afd0d0713be99736989256359f09399b671349f24d8f9bc60e1d6aff7884c4a7/files/conformance.json#/data/observations/5

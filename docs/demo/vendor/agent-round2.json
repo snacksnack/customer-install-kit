@@ -1,0 +1,41 @@
+{
+ "schema": "cik.triage-record/1",
+ "case_id": "case-afd0d0713be9",
+ "round": 2,
+ "run_id": "tr-50693e02e232255a",
+ "mode": "agent",
+ "registry_digest": "sha256:4700a81003e099163a84acf6eb407aaefe0745b310f15a8d80d23030d335a7f0",
+ "rules_outcome": "supported_diagnosis",
+ "rules_findings": [
+  {
+   "rule": "TRI-DB-PRIV",
+   "status": "supported"
+  }
+ ],
+ "rules_followups": [],
+ "outcome": "insufficient_evidence",
+ "stop_reason": "diagnosis",
+ "agent_finding_statuses": [
+  "supported",
+  "insufficient"
+ ],
+ "followup_requested": null,
+ "followup_request_id": null,
+ "model_calls": 3,
+ "tool_calls": 6,
+ "rejected_submissions": 0,
+ "citations": 11,
+ "citations_resolved": 11,
+ "usage": {
+  "input_tokens": 12372,
+  "output_tokens": 3786,
+  "cache_read_input_tokens": 8426,
+  "cache_creation_input_tokens": 4213
+ },
+ "cost_usd": 0.147958,
+ "models": [
+  "claude-opus-5-5"
+ ],
+ "error_type": "none",
+ "telemetry_status": 202
+}

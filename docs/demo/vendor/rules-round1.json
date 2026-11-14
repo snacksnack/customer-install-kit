@@ -1,0 +1,33 @@
+{
+ "schema": "cik.triage-record/1",
+ "case_id": "case-afd0d0713be9",
+ "round": 1,
+ "run_id": "tr-e99abddcafd921c3",
+ "mode": "rules",
+ "registry_digest": "sha256:4700a81003e099163a84acf6eb407aaefe0745b310f15a8d80d23030d335a7f0",
+ "rules_outcome": "insufficient_evidence",
+ "rules_findings": [
+  {
+   "rule": "TRI-DB-PRIV",
+   "status": "insufficient"
+  }
+ ],
+ "rules_followups": [
+  "FUP-DB-PRIV"
+ ],
+ "outcome": "awaiting_followup",
+ "stop_reason": "followup_requested",
+ "agent_finding_statuses": [],
+ "followup_requested": "FUP-DB-PRIV",
+ "followup_request_id": "fr-dcc6a1dfdbbf",
+ "model_calls": 0,
+ "tool_calls": 0,
+ "rejected_submissions": 0,
+ "citations": 0,
+ "citations_resolved": 0,
+ "usage": {},
+ "cost_usd": 0.0,
+ "models": [],
+ "error_type": "none",
+ "telemetry_status": 202
+}

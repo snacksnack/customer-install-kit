@@ -1,0 +1,165 @@
+{
+  "config": {
+    "app": "cik-esp-p5",
+    "fly_org": "<customer-org>",
+    "public_url": "<redacted>",
+    "region": "iad",
+    "volume": "cik_data"
+  },
+  "created_at": "2026-11-14T15:28:11+00:00",
+  "history": [
+    {
+      "action": "install",
+      "at": "2026-11-14T15:28:55+00:00",
+      "from": null,
+      "to": "0.1.4"
+    },
+    {
+      "action": "teardown",
+      "app": "destroyed",
+      "app_role": "dropped",
+      "at": "2026-11-14T15:35:03+00:00",
+      "database": "retained (customer data is never deleted by the kit)",
+      "volume": "destroyed"
+    }
+  ],
+  "install_id": "4e9702cb79a84d06abf2d45756a4610a",
+  "installed_version": "0.1.4",
+  "profile": "v1",
+  "release": {
+    "commit": "2a4968c8b7a8feda4a46414f55d0735f98a0e2de",
+    "db_schema": {
+      "compatible_with": 1,
+      "version": 1
+    },
+    "image": "ghcr.io/snacksnack/esp-migration-agent@sha256:957bc24a72f1840733bf635a77d1f61794d7f89dbdc134eeaeff2641c53c0a91",
+    "manifest_sha256": "377320bb3a4a34d256d625056f3111da6b592d255eb43b4457eca321d65a2f8b",
+    "sbom_sha256": "1730721cf55718256eff1ca11decab9f9a70f3ee320cbda4c77fde142c75c1dd",
+    "version": "0.1.4"
+  },
+  "report_key": {
+    "algorithm": "ed25519",
+    "fingerprint": "sha256:e0edc151ddde17a297a9ac22fed3b508bef3b4ff96b3bdd46b49c42c93cebcc5",
+    "public_key": "fbzenIo9yLbWPW3OMUCYxFFJ3j9st6U4XAO/OQv0b8c="
+  },
+  "resources": {
+    "app": {
+      "name": "cik-esp-p5",
+      "org": "<customer-org>",
+      "ownership": "created"
+    },
+    "database": {
+      "app_role": "esp_app",
+      "database": "neondb",
+      "host": "<customer-db-host>",
+      "migrated_at": "2026-11-14T15:28:19+00:00",
+      "ownership": "adopted",
+      "schema": {
+        "compatible_with": 1,
+        "version": 1
+      }
+    },
+    "volume": {
+      "id": "vol_re16zqj17md69554",
+      "name": "cik_data",
+      "ownership": "created"
+    }
+  },
+  "runtime_preflight": {
+    "exit_status": 0,
+    "failing_required": [],
+    "run_id": "2baf7cae40d942de87742081dda99530",
+    "summary": {
+      "fail": 1,
+      "not_applicable": 0,
+      "pass": 8,
+      "unknown": 0
+    }
+  },
+  "schema": "cik.install/1",
+  "secrets": {
+    "generated": [
+      "ESP_REVIEW_SESSION_SECRET",
+      "ESP_REVIEW_PASSWORD"
+    ],
+    "pushed": [
+      "ESP_BREVO_API_KEY",
+      "ESP_DATABASE_URL",
+      "ESP_REVIEW_PASSWORD",
+      "ESP_REVIEW_SESSION_SECRET",
+      "ESP_SESSION_TOKEN_KEY"
+    ]
+  },
+  "state": "torn_down",
+  "steps": {
+    "app": {
+      "action": "created",
+      "at": "2026-11-14T15:28:13+00:00",
+      "status": "done"
+    },
+    "app_role": {
+      "action": "created",
+      "at": "2026-11-14T15:28:20+00:00",
+      "status": "done"
+    },
+    "deploy": {
+      "action": "deployed",
+      "at": "2026-11-14T15:28:25+00:00",
+      "config_sha256": "6d0d11cd364aa1f8384a2f9e53df0966a5e32870bd11ee7068b9f87a3365fb0c",
+      "status": "done"
+    },
+    "health": {
+      "at": "2026-11-14T15:28:43+00:00",
+      "attempts": 2,
+      "status": "done"
+    },
+    "preflight_operator": {
+      "at": "2026-11-14T15:28:12+00:00",
+      "exit_status": 0,
+      "status": "done"
+    },
+    "preflight_runtime": {
+      "at": "2026-11-14T15:28:54+00:00",
+      "exit_status": 0,
+      "status": "done"
+    },
+    "report_key": {
+      "at": "2026-11-14T15:28:12+00:00",
+      "created": true,
+      "status": "done"
+    },
+    "schema": {
+      "action": "migrated",
+      "at": "2026-11-14T15:28:19+00:00",
+      "status": "done",
+      "version": 1
+    },
+    "secrets": {
+      "action": "staged",
+      "at": "2026-11-14T15:28:21+00:00",
+      "status": "done"
+    },
+    "verify_release": {
+      "at": "2026-11-14T15:28:12+00:00",
+      "digest": "sha256:957bc24a72f1840733bf635a77d1f61794d7f89dbdc134eeaeff2641c53c0a91",
+      "status": "done"
+    },
+    "volume": {
+      "action": "created",
+      "at": "2026-11-14T15:28:15+00:00",
+      "status": "done"
+    }
+  },
+  "target_release": {
+    "commit": "2a4968c8b7a8feda4a46414f55d0735f98a0e2de",
+    "db_schema": {
+      "compatible_with": 1,
+      "version": 1
+    },
+    "image": "ghcr.io/snacksnack/esp-migration-agent@sha256:957bc24a72f1840733bf635a77d1f61794d7f89dbdc134eeaeff2641c53c0a91",
+    "manifest_sha256": "377320bb3a4a34d256d625056f3111da6b592d255eb43b4457eca321d65a2f8b",
+    "sbom_sha256": "1730721cf55718256eff1ca11decab9f9a70f3ee320cbda4c77fde142c75c1dd",
+    "version": "0.1.4"
+  },
+  "updated_at": "2026-11-14T15:35:03+00:00"
+}

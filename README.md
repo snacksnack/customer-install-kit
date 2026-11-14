@@ -15,7 +15,7 @@ Jira: epic RC1-594, phases RC1-638..647.
 
 ## Status
 
-Phases 0A (RC1-638), 0B (RC1-646), 1 (RC1-639) and 2 (RC1-640) done. Phase 3 (RC1-641) done: customer-side conformance and signed reports. Phase 4 (RC1-642) done: diagnostic bundles. Phase 5 (RC1-643): rules-first triage, a bounded agent with allowlisted follow-up checks, and a sealed runtime. Phase 6 (RC1-644): the sealed rules-versus-agent evaluation has run; [results report](docs/phase6/report.md). The [preflight coverage suite](docs/phase6/preflight-coverage.md) has run: 4 of 4 caught, after two preflight fixes it found. The Datadog and CI integration are still open.
+All phases are done (RC1-638..645). Start with the **[engagement writeup](docs/engagement.md)**: what the customer gets, one support case end to end, rules versus agent triage, and the limits. Then the [demo](docs/demo.md) with its real artifacts, the customer runbooks ([install, upgrade, recovery, teardown](docs/install.md), [conformance](docs/conformance.md), [bundles](docs/bundle.md), [support handoff](docs/support.md)), and the [Phase 6 results](docs/phase6/report.md). `tests/test_engagement.py` re-derives every number in the writeup from committed artifacts.
 
 ## Preflight
 

@@ -1,0 +1,47 @@
+collecting health
+collecting fly_status
+collecting fly_machines
+collecting fly_releases
+collecting fly_secrets
+collecting platform_log
+collecting file_sink
+collecting install_record
+collecting preflight_operator
+collecting preflight_runtime
+collecting conformance
+bundle diag-20261114T153048Z-14b656: 11 files, 14852 bytes, digest sha256:afd0d0713be99736989256359f09399b671349f24d8f9bc60e1d6aff7884c4a7
+
+bundle diag-20261114T153048Z-14b656  install 4e9702cb79a84d06abf2d45756a4610a  app cik-esp-p5
+digest sha256:afd0d0713be99736989256359f09399b671349f24d8f9bc60e1d6aff7884c4a7
+release 0.1.4  allowlist v1  registry v1  event schemas [1, 2]
+collected 2026-11-14T15:30:48Z .. 2026-11-14T15:31:03Z
+
+What would leave, file by file:
+  [included] health  files/health.json  201 bytes
+      Liveness of the web process, as the customer's users would see it.
+  [included] fly_status  files/fly_status.json  179 bytes
+      Whether Fly considers the app deployed, and its release number.
+  [included] fly_machines  files/fly_machines.json  1771 bytes
+      Machine state, image digest, health-check status, and lifecycle events (exits, restarts, OOM kills).
+  [included] fly_releases  files/fly_releases.json  417 bytes
+      Deploy history: which release, when, and whether it went stable.
+  [included] fly_secrets  files/fly_secrets.json  467 bytes
+      Which secrets the app has and whether each is deployed or only staged. Names only: Fly's per-secret digest is dropped.
+  [included] platform_log  files/platform_log.json  858 bytes
+      ESP error events (validated per schema version) and startup exception TYPES from the platform's short log buffer. Log text is not kept.
+      kept: {'events': 1}
+  [included] file_sink  files/file_sink.json  1248 bytes
+      ESP error events from the file sink on the volume, read even when ESP is down. Validated per schema version; non-conforming records dropped and counted.
+      kept: {'events': 3}
+  [included] install_record  files/install_record.json  2460 bytes
+      What was installed, by which release, which resources it owns, and the last runtime preflight summary.
+  [included] preflight_operator  files/preflight_operator.json  1487 bytes
+      The operator-side preflight report, re-validated against this kit's check registry.
+  [included] preflight_runtime  files/preflight_runtime.json  3168 bytes
+      The in-machine preflight report from the last install, re-validated.
+  [included] conformance  files/conformance.json  2596 bytes
+      The latest conformance verdict and each check's outcome and reason (evidence stays in the workspace).
+
+Read any file in ~/acme-install/bundles/diag-20261114T153048Z-14b656/files before exporting.
+Nothing has been sent. `export` writes an archive; you choose where it goes.
+A file is included only if no detector fired on its bytes. This is bounded coverage by these detectors, not proof that nothing sensitive is present.
