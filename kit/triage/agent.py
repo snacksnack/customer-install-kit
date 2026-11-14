@@ -52,6 +52,12 @@ class Budget:
     tool_calls: int = 24
     followup_rounds: int = 2
     usd: float = 1.50
+    # Wall clock (RC1-644). The SDK default is 600 s a request with 2 retries,
+    # so one stalled call could hold a round for half an hour; one held an
+    # eval run for 12 minutes on 2026-11-14. Each call's timeout is capped by
+    # what is left of the round.
+    seconds: float = 600.0
+    call_timeout_s: float = 300.0
 
 
 @dataclass
@@ -212,9 +218,9 @@ class Agent:
         self.client, self.model, self.effort = client, model, effort
         self.budget = budget or Budget()
 
-    def _call(self, system: str, tool_defs, messages):
+    def _call(self, system: str, tool_defs, messages, timeout: float):
         return self.client.beta.messages.create(
-            model=self.model, max_tokens=MAX_TOKENS,
+            model=self.model, max_tokens=MAX_TOKENS, timeout=timeout,
             system=[{"type": "text", "text": system, "cache_control": {"type": "ephemeral"}}],
             tools=tool_defs, messages=messages, output_config={"effort": self.effort},
             betas=[FALLBACK_BETA], fallbacks="default")
@@ -228,7 +234,12 @@ class Agent:
         log({"role": "user", "content": messages[0]["content"]})
         out = RoundResult("budget_exhausted", "budget_model_calls")
         nudged = False
+        deadline = time.monotonic() + self.budget.seconds
         while True:
+            remaining = deadline - time.monotonic()
+            if remaining <= 0:
+                out.stop_reason = "budget_seconds"
+                return out
             if out.model_calls >= self.budget.model_calls:
                 out.stop_reason = "budget_model_calls"
                 return out
@@ -237,7 +248,8 @@ class Agent:
                 return out
             started = time.time_ns()
             try:
-                resp = self._call(system, tool_defs, messages)
+                resp = self._call(system, tool_defs, messages,
+                                  min(self.budget.call_timeout_s, remaining))
             except Exception as exc:  # the round ends; the type is kept, never the message
                 kind = type(exc).__name__
                 etype = ("rate_limited" if "RateLimit" in kind else

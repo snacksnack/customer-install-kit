@@ -42,7 +42,7 @@ It has exactly three strict tools:
 - `request_followup(check_id, reason, discriminates)` takes a check id from an enum of `followups.toml` ids, writes a `cik.followup-request/1`, and ends the round.
 - `submit_diagnosis(...)` is validated, then refused back to the model until it passes. The checks: every citation resolves, a remedy appears only on a supported finding, and the outcome follows from the statuses.
 
-Bounds per round are 10 model calls, 24 tool calls, and $1.50, plus 2 follow-up rounds per case. Hitting one ends the round as `budget_exhausted`. Optimizing correctness comes before reducing round trips: the bounds stop runaway loops, not clarification.
+Bounds per round are 10 model calls, 24 tool calls, $1.50 and 600 seconds of wall clock, plus 2 follow-up rounds per case. Each model call times out at 300 seconds or at what is left of the round, whichever is sooner (the wall-clock bound was added in RC1-644). Hitting one ends the round as `budget_exhausted`. Optimizing correctness comes before reducing round trips: the bounds stop runaway loops, not clarification.
 
 **Follow-up checks are the kit's, run by the customer, returned as a bundle.** `followups.toml` lists three checks, each read-only, each with its permissions written out:
 
