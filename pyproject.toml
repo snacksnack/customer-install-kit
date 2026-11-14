@@ -12,6 +12,13 @@ dependencies = [
 ]
 
 [dependency-groups]
+# The shared eval harness, pinned by tag (RC1-644). Not the llmobs extra: it
+# turns on ddtrace's Anthropic integration, which would trace prompts that
+# carry bundle content (ADR 0009). pyyaml reads triage/compose.yaml.
+evals = [
+    "agent-evals[sql] @ git+https://github.com/snacksnack/agent-evals@v0.6.3",
+    "pyyaml>=6",
+]
 dev = [
     "ruff>=0.6",
     "pytest>=8",
