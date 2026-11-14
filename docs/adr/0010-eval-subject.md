@@ -30,5 +30,5 @@ The free cases run in CI on every change (`--free`).
 ## Consequences
 
 - A run costs about $0.95 and takes about four minutes.
-- The eval passes the agent an Anthropic client with a 300 s request timeout. The SDK default is 600 s with two retries, and one stalled call held a run for 12 minutes on 2026-11-14. The kit's own triage path still uses the default and has no wall-clock budget. That is an open kit finding.
+- The eval passes the agent an Anthropic client with a 300 s request timeout. The SDK default is 600 s with two retries, and one stalled call held a run for 12 minutes on 2026-11-14. The kit's triage path got its own wall-clock budget in #24: 600 s a round, with each call capped at 300 s.
 - Citation grounding varies from run to run on `family2-destination`: it passed in 3 of 5 runs on 2026-11-14 after the supplement fix, and every one of those runs reached the right supported outcome. That characteristic gates anyway: a supported diagnosis that does not cite the evidence that discriminates is the failure this kit is built to prevent.

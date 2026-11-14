@@ -34,8 +34,8 @@ from evals import subject
 SERIES = "https://api.{site}/api/v2/series"
 GAUGE = 3  # the v2 series `type` is an int enum
 # The SDK default is 600 s a request with 2 retries, so one stalled call can
-# hold a sweep for half an hour (seen 2026-11-14). The kit itself has no
-# wall-clock budget; that is a kit finding, not fixed here.
+# hold a sweep for half an hour (seen 2026-11-14). The agent's own round
+# budget (#24) caps calls too; this keeps the eval bounded regardless.
 MODEL_TIMEOUT_S = 300.0
 
 
