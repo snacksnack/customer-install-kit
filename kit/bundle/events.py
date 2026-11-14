@@ -49,7 +49,9 @@ _CORRELATION = re.compile(r"^[0-9a-f]{8,64}$")
 _RELEASE = re.compile(r"^[0-9A-Za-z][0-9A-Za-z.+-]{0,63}$")
 _SQLSTATE = re.compile(r"^[0-9A-Z]{5}$")
 _ERRNO_NAME = re.compile(r"^E[A-Z0-9]{1,15}$")
-_SEGMENT = re.compile(r"^([a-z][a-z0-9_-]*|v\d+|\{[a-z_]+\})$")
+# ESP's own route mask (esp errorevents/events.py _SAFE_SEGMENT): a plain word in
+# either case (Brevo's paths are camel case), an API version, or a placeholder.
+_SEGMENT = re.compile(r"^([A-Za-z_-]+|v\d{1,3}|\{[A-Za-z_]+\})$")
 
 
 def _route_ok(route: str) -> bool:
