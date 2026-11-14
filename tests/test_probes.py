@@ -9,6 +9,7 @@ import os
 import socket
 import threading
 from contextlib import contextmanager
+from pathlib import Path
 
 import psycopg
 import pytest
@@ -294,6 +295,20 @@ def test_volume_read_only(tmp_path):
     finally:
         tmp_path.chmod(0o700)
     assert result.reason is Reason.REFUSED and result.evidence["errno"] == 13
+
+
+def test_volume_read_only_mount_is_refused_not_probe_error(tmp_path, monkeypatch):
+    """On a read-only mount both create and unlink fail with EROFS, even for a
+    file that does not exist. Measured on Fly 2026-11-14 (RC1-644, P4): the
+    cleanup unlink escaped the probe as probe_error."""
+    def erofs(*args, **kwargs):
+        raise OSError(30, "Read-only file system")
+
+    monkeypatch.setattr(Path, "open", erofs)
+    monkeypatch.setattr(Path, "unlink", erofs)
+    result = run("RT-003", ProbeEnv(), path=str(tmp_path), minimum_free_bytes=1)
+    assert (result.outcome, result.reason) == (Outcome.FAIL, Reason.REFUSED)
+    assert result.evidence["writable"] is False and result.evidence["errno"] == 30
 
 
 def test_volume_full_at_fsync_is_caught(tmp_path, monkeypatch):

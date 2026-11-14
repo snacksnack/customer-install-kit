@@ -3,7 +3,9 @@ evidence contract, the secret guard, and the report schema round trip."""
 
 import json
 import time
+import tomllib
 from dataclasses import replace
+from pathlib import Path
 
 import pytest
 
@@ -11,6 +13,8 @@ from kit import __main__ as cli
 from kit import preflight, registry, report
 from kit.model import Context, Outcome, ProbeResult, Reason, Severity
 from kit.probes import PROBES, ProbeEnv
+
+TEMPLATE = Path(__file__).resolve().parent.parent / "kit/install/fly.toml.tmpl"
 
 REG = registry.load(probe_ids=frozenset(PROBES))
 RUNTIME_IDS = [c.id for c in REG.checks if c.context is Context.RUNTIME]
@@ -128,6 +132,25 @@ def test_secret_guard():
     for leaked in ("key=xkeysib-planted-secret", "pw planted-pw-77 in text"):
         with pytest.raises(preflight.KitError):
             preflight.assert_no_secrets(leaked, environ)
+
+
+def test_public_config_may_be_quoted():
+    """RT-004's remediation quotes the default sink path. With every ESP_ value
+    treated as a secret, the kit refused to report any RT-004 failure on a
+    default install (RC1-644, P4)."""
+    environ = {"ESP_ERROR_EVENTS_PATH": "/data/esp-error-events.jsonl",
+               "ESP_PUBLIC_URL": "https://cik-esp-p3.fly.dev",
+               "ESP_BREVO_API_KEY": "xkeysib-planted-secret"}
+    remediation = registry.load().get("RT-004").remediation
+    assert environ["ESP_ERROR_EVENTS_PATH"] in remediation
+    preflight.assert_no_secrets(remediation + environ["ESP_PUBLIC_URL"], environ)
+    with pytest.raises(preflight.KitError):
+        preflight.assert_no_secrets(remediation + "xkeysib-planted-secret", environ)
+
+
+def test_public_config_matches_the_fly_toml_template():
+    template = tomllib.loads(TEMPLATE.read_text())
+    assert set(template["env"]) == preflight.PUBLIC_CONFIG
 
 
 def test_report_reader_rejects_what_it_cannot_interpret():
