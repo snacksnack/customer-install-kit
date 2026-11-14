@@ -1,0 +1,54 @@
+# RC1-644 sealed expectations: held-out family H2. EVALUATOR-SIDE ONLY.
+#
+# Drawn 2026-11-14 00:02Z (NIST beacon chain 2 pulse 2026639, customer-install-kit
+# PR #15). Written after the draw and before any H2 case is injected or triaged.
+# The sha256 of this file is published in customer-install-kit
+# docs/phase6/cases.md before the first H2 case runs, and revealed unchanged
+# after scoring. Grading categories and amendment rules are the same as in
+# dev-expected.toml.
+#
+# H2: the destination credential is valid but under-scoped. Each case replaces the
+# Brevo key, in the install's secrets file and on the app (via kit install), with
+# a Brevo "Restricted" key. Brevo marks Restricted as the recommended access type.
+# Mechanics were checked on the workstation before sealing, with empty-body writes
+# (400 when permitted, 403 permission_denied when not): reads not covered by a
+# permission return 403 permission_denied, an invalid or deactivated key returns
+# 401 unauthorized.
+
+seal_version = 1
+salt = "d8599218a9768ccb0d240b9760b5a14c"
+registry_digest = "sha256:4700a81003e099163a84acf6eb407aaefe0745b310f15a8d80d23030d335a7f0"
+family = "H2"
+
+[cases.H2-1]
+family = "H2"
+tags = ["confusable_with:F2-1"]
+truth = "The app's Brevo key is a restricted key with Contacts set to Read. Every contact, list and folder write is refused with 403 permission_denied; reads and account access work. The same key is in the secrets file and on the app, applied with kit install."
+cause = "destination: key lacks write permission (contacts)"
+correct_remedy = "Give the key write access to contacts (Contacts: All, or a Full-access key), put it in the install's secrets file, run kit install, then kit verify."
+unsupported = ["key invalid, expired or deactivated", "source-address restriction", "the app holds a different key than the workstation", "rate limit", "any database or storage cause"]
+abstention_ok = false
+evidence_note = "The app's error events show a contact, list or folder write (POST /contacts/folders, /contacts/lists or /contacts) refused with 403 permission_denied. FUP-DEST-AUTH returns 200 on GET /account and GET /contacts/lists from both vantages, so the key is valid and identical. A 403 permission_denied on a write that the same key can read around is sufficient evidence of a missing permission."
+exclusive = true
+
+[cases.H2-2]
+family = "H2"
+tags = ["partial_write"]
+truth = "The app's Brevo key is a restricted key with Email campaigns set to Read. The run creates the folder, list and contacts, then the campaign create is refused with 403 permission_denied. The same key is in the secrets file and on the app, applied with kit install."
+cause = "destination: key lacks write permission (email campaigns)"
+correct_remedy = "Give the key write access to email campaigns (Email campaigns: All, or a Full-access key), put it in the install's secrets file, run kit install, then kit verify."
+unsupported = ["key invalid, expired or deactivated", "source-address restriction", "the app holds a different key than the workstation", "contacts or list permission", "rate limit", "any database or storage cause"]
+abstention_ok = false
+evidence_note = "The app's error events show POST /emailCampaigns refused with 403 permission_denied after contact writes in the same run succeeded. FUP-DEST-AUTH returns 200 on both routes from both vantages. The failing route names the missing permission."
+exclusive = true
+
+[cases.H2-3]
+family = "H2"
+tags = ["confusable_with:F2-1", "confusable_with:F2-3"]
+truth = "The app's Brevo key is a restricted key with Account set to None. GET /account and GET /senders are refused with 403 permission_denied; contact and campaign routes work. The same key is in the secrets file and on the app, applied with kit install."
+cause = "destination: key lacks account read permission"
+correct_remedy = "Give the key account read access (Account: Read or higher, or a Full-access key), put it in the install's secrets file, run kit install, then kit verify."
+unsupported = ["key invalid, expired or deactivated", "source-address restriction", "the app holds a different key than the workstation", "rate limit", "any database or storage cause"]
+abstention_ok = false
+evidence_note = "FUP-DEST-AUTH: GET /account 403 permission_denied from both vantages, GET /contacts/lists 200 from both. 403 permission_denied rather than 401 unauthorized, the same at both vantages, and another route succeeding with the same key rule out a bad, deactivated or mismatched key and an IP restriction."
+exclusive = true
