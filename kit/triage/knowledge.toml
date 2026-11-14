@@ -9,13 +9,16 @@
 # Part of the frozen triage registry (kit/triage/registry.py). Bump `version`
 # on any change; every triage record carries the registry digest.
 
-version = 1
+version = 2
 
 # What each ESP operation touches, from ESP's own code (review_ui/db_setup.py
 # grants, the audit/session/SCIM stores). A 42501 on an operation narrows the
 # missing privilege to these objects; it does not say which one.
+# audit.append reads the chain tip (SELECT ... ORDER BY seq DESC LIMIT 1) before
+# its INSERT (ESP review_ui/pgstore.py record_within), so it needs both. v1 listed
+# INSERT only; found in the RC1-645 demo, after the Phase 6 freeze.
 [operations."audit.append"]
-needs = ["schema public USAGE", "review_audit INSERT"]
+needs = ["schema public USAGE", "review_audit SELECT", "review_audit INSERT"]
 [operations."audit.read"]
 needs = ["schema public USAGE", "review_audit SELECT"]
 [operations."audit.verify"]

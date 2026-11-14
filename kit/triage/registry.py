@@ -9,6 +9,7 @@ change after the freeze is visible as a different digest.
 
 import hashlib
 import tomllib
+from collections.abc import Callable
 from dataclasses import dataclass
 from functools import cache
 from pathlib import Path
@@ -34,10 +35,13 @@ class Followup:
     discriminates: str
 
 
-def digest() -> str:
+def digest(read: Callable[[str], bytes] | None = None) -> str:
+    """The registry digest. `read` maps a file name to its bytes (default: this
+    checkout), so a past freeze can be recomputed from git."""
+    read = read or (lambda name: (HERE / name).read_bytes())
     h = hashlib.sha256()
     for name in FILES:
-        data = (HERE / name).read_bytes()
+        data = read(name)
         h.update(f"{name}\0{len(data)}\0".encode())
         h.update(data)
     return "sha256:" + h.hexdigest()
@@ -46,7 +50,7 @@ def digest() -> str:
 @cache
 def knowledge() -> dict[str, Any]:
     raw = tomllib.loads((HERE / "knowledge.toml").read_text())
-    if raw.get("version") != 1:
+    if raw.get("version") != 2:
         raise RegistryError("knowledge.toml version is not one this kit knows")
     return raw
 

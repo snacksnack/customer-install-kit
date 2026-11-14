@@ -1,4 +1,5 @@
 import json
+import subprocess
 from pathlib import Path
 
 import pytest
@@ -18,9 +19,15 @@ def at_fixture(monkeypatch):
     monkeypatch.setattr(draw, "DRAW_AT", "2026-11-13T04:03:30.000Z")
 
 
-def test_committed_freeze_matches_the_registry():
-    # The draw is only valid against the frozen registry. Any registry edit fails here.
-    assert registry.digest() == draw.REGISTRY_DIGEST
+def test_committed_freeze_matches_the_registry_at_the_freeze_commit():
+    # The draw is only valid against the frozen registry. The registry may change
+    # after Phase 6; the digest recorded for the draw must still be the one the
+    # files at the freeze commit produce. (CI checks out full history for this.)
+    def at_freeze(name: str) -> bytes:
+        return subprocess.run(["git", "show", f"{draw.FREEZE_COMMIT}:kit/triage/{name}"],
+                              check=True, capture_output=True).stdout
+
+    assert registry.digest(at_freeze) == draw.REGISTRY_DIGEST
 
 
 def test_draw_is_the_formula_over_the_first_pulse_at_or_after(at_fixture):
@@ -49,7 +56,7 @@ def test_cli_rechecks_from_saved_pulses(at_fixture, capsys):
     assert draw.main(["--pulse", str(FIX / "pulse-2025443.json"),
                       "--previous", str(FIX / "pulse-2025442.json")]) == 0
     out = json.loads(capsys.readouterr().out)
-    assert out["drawn"] in draw.CANDIDATES and out["registry_digest"] == registry.digest()
+    assert out["drawn"] in draw.CANDIDATES and out["registry_digest"] == draw.REGISTRY_DIGEST
 
 
 def test_cli_refuses_before_the_committed_time(monkeypatch):
