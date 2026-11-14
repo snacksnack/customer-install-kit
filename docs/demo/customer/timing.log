@@ -1,0 +1,17 @@
+install start 2026-11-14T15:28:10Z
+install end 2026-11-14T15:28:55Z exit=0 seconds=45
+verify-1 exit=0 seconds=38
+fault injected 2026-11-14T15:29:58Z
+verify-2 exit=1
+collect exit=0 seconds=15
+rules seconds=3
+triage rules r1 exit=0 seconds=3
+triage agent r1 exit=0 seconds=25
+triage rules round1 exit=0 seconds=2
+triage agent round1 exit=0 seconds=16
+followup seconds=1
+triage rules round2 exit=0 seconds=2
+triage agent round2 exit=0 seconds=36
+remedy applied 2026-11-14T15:34:07Z
+verify-3 exit=0 seconds=35
+teardown exit=0 seconds=3

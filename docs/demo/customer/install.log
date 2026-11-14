@@ -1,0 +1,7 @@
+verified v0.1.4 ghcr.io/snacksnack/esp-migration-agent@sha256:957bc24a72f1840733bf635a77d1f61794d7f89dbdc134eeaeff2641c53c0a91
+app cik-esp-p5: created (created)
+volume cik_data vol_re16zqj17md69554: created (created)
+schema applied
+generated ESP_REVIEW_SESSION_SECRET, ESP_REVIEW_PASSWORD into .env.cik
+deploying ghcr.io/snacksnack/esp-migration-agent@sha256:957bc24a72f1840733bf635a77d1f61794d7f89dbdc134eeaeff2641c53c0a91
+install installed: v0.1.4 on cik-esp-p5

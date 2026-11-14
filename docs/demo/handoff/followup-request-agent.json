@@ -1,0 +1,9 @@
+{
+  "check_id": "FUP-DB-PRIV",
+  "discriminates": "Which grants esp_app is missing right now. If only review_audit SELECT/INSERT are missing, the fix is limited to the audit table. If schema public USAGE is missing, every operation is affected. Missing session/SCIM grants would mean a wider loss of grants. The check also flags any must-not-have grant (review_audit UPDATE/DELETE) the role holds. If everything is granted now, the fault has stopped. The matrix gives the exact GRANT statements for the remedy.",
+  "issued_at": "2026-11-14T15:32:41Z",
+  "parent_bundle": "sha256:afd0d0713be99736989256359f09399b671349f24d8f9bc60e1d6aff7884c4a7",
+  "reason": "On the current release 0.1.4, during conformance run 20261114t152959-87a6 (15:29:59\u201315:30:38Z), the database refused audit.append and audit.read three times with SQLSTATE 42501 at 15:30:02Z. CNF-012 (approver_sign_in) failed and CNF-013 (audit_append) could not run. A 42501 shows the app role logs in but is missing a privilege. The bundle doesn't say which one: schema public USAGE, review_audit SELECT, or review_audit INSERT. It also doesn't say whether other grants are gone. The database was adopted rather than created, so grants set up outside the install are plausible.",
+  "request_id": "fr-3058ac1ee42d",
+  "schema": "cik.followup-request/1"
+}

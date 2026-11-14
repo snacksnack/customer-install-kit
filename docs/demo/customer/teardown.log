@@ -1,0 +1,4 @@
+app: destroyed
+volume: destroyed
+app_role: dropped
+database: retained (customer data is never deleted by the kit)
