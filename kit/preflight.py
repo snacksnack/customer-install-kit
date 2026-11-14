@@ -33,6 +33,12 @@ EXIT_KIT_ERROR = 3
 SECRET_PREFIXES = ("ESP_", "CIK_")
 SECRET_NAMES = frozenset({"DATABASE_URL", "PGPASSWORD"})
 MIN_SECRET_LENGTH = 8
+# The non-secret [env] keys the kit writes into the app's fly.toml
+# (kit/install/fly.toml.tmpl; a test keeps the two in step). Their values are
+# public configuration that remediation text may quote: RT-004's names the
+# default sink path, so treating it as a secret made the kit refuse to report
+# any RT-004 failure on a default install (RC1-644, P4).
+PUBLIC_CONFIG = frozenset({"ESP_ENVIRONMENT", "ESP_PUBLIC_URL", "ESP_ERROR_EVENTS_PATH"})
 
 
 class KitError(Exception):
@@ -96,6 +102,8 @@ def exit_status(registry: Registry, observations: list[Observation]) -> int:
 def secret_values(environ: dict[str, str]) -> set[str]:
     values: set[str] = set()
     for name, value in environ.items():
+        if name in PUBLIC_CONFIG:
+            continue
         if not (name.startswith(SECRET_PREFIXES) or name in SECRET_NAMES):
             continue
         values.add(value)

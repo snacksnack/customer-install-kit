@@ -1,5 +1,6 @@
 """Machine probes: architecture, memory, and writable storage."""
 
+import contextlib
 import os
 import uuid
 from pathlib import Path
@@ -67,8 +68,10 @@ def write_test(path: Path, minimum_free: int) -> ProbeResult:
     if not evidence["exists"]:
         return ProbeResult(Outcome.FAIL, Reason.MISSING, evidence)
     probe_file = path / f".cik-preflight-{uuid.uuid4().hex}"
+    created = False
     try:
         with probe_file.open("wb") as fh:
+            created = True
             fh.write(b"\0" * 4096)
             fh.flush()
             os.fsync(fh.fileno())
@@ -77,7 +80,12 @@ def write_test(path: Path, minimum_free: int) -> ProbeResult:
         evidence["writable"] = False
         evidence["errno"] = exc.errno
     finally:
-        probe_file.unlink(missing_ok=True)
+        # On a read-only mount, unlink fails with EROFS even for a file that
+        # was never created (the mount is checked before the name), which
+        # turned the read-only case into a probe error (RC1-644, P4).
+        if created:
+            with contextlib.suppress(OSError):
+                probe_file.unlink()
     stats = os.statvfs(path)
     evidence["free_bytes"] = stats.f_bavail * stats.f_frsize
     if not evidence["writable"]:

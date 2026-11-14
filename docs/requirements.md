@@ -24,7 +24,7 @@ Secret values are never recorded. Evidence is limited to the fields listed per c
 | RT-001 | CPU architecture is amd64 | required | runtime |
 | RT-002 | Machine is sized at 512 MB or more | required | runtime |
 | RT-003 | Data volume is writable with free space | required | runtime |
-| RT-004 | Error-event file sink is writable | advisory | runtime |
+| RT-004 | Error-event file sink is writable | required | runtime |
 
 ## On the operator workstation
 
@@ -156,9 +156,9 @@ Run with `python -m kit preflight --context runtime` inside a machine of the app
 
 ### RT-004: Error-event file sink is writable
 
-**Advisory** · profiles: v1
+**Required** · profiles: v1
 
-- **Why:** When ESP_ERROR_EVENTS_PATH is set, the app also appends error events to that file. Events always reach stderr regardless, so this is advisory.
+- **Why:** When ESP_ERROR_EVENTS_PATH is set, the app also appends error events to that file. Work run over `fly ssh` (the executor `kit verify` drives) reaches only this file, not the platform log, so a broken sink loses those events with no other record (ADR 0008). Required when set; not applicable, and so never blocking, when unset (RC1-644).
 - **How it is checked:** If ESP_ERROR_EVENTS_PATH is set, runs the RT-003 write test in its directory. Not applicable when unset.
 - **Access needed:** None beyond running in a machine of the customer's app.
 - **If it fails:** Point ESP_ERROR_EVENTS_PATH at a file on the data volume (for example /data/esp-error-events.jsonl), or unset it.
