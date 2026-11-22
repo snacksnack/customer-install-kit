@@ -22,6 +22,8 @@ evals = [
 dev = [
     "ruff>=0.6",
     "pytest>=8",
+    "pytest-cov>=5",
+    "ddtrace>=4.14,<5",
 ]
 
 [tool.uv]
@@ -41,3 +43,7 @@ select = ["E", "F", "I", "UP", "B", "SIM"]
 testpaths = ["tests"]
 addopts = "-q"
 pythonpath = ["."]
+markers = ["planted_values: holds planted secrets or PII; never run under --ddtrace"]
+
+[tool.coverage.run]
+source = ["kit"]
