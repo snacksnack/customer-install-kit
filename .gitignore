@@ -8,3 +8,4 @@ spike/customer-ws/*
 .cik-releases/
 triage/in/
 triage/case-store/
+.coverage

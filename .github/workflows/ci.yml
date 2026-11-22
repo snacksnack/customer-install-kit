@@ -30,9 +30,22 @@ jobs:
       - run: uv run python -m kit requirements --check
       # tests/test_release_live.py verifies the committed v0.1.2 release
       # against Sigstore's public trust root (network, like a real install).
-      - run: uv run pytest
+      # RC1-676: test files with planted secrets or PII run unreported, because
+      # Test Optimization records parameters and failure messages (ADR 0009).
+      - run: uv run pytest -m planted_values
         env:
           CIK_TEST_PG_ADMIN_URL: postgresql://postgres:ci-only@localhost:5432/postgres
+      # Everything else reports results and coverage, agentless. The Anthropic
+      # integration stays off because it records prompts.
+      - run: uv run pytest -m "not planted_values" --ddtrace --cov
+        env:
+          CIK_TEST_PG_ADMIN_URL: postgresql://postgres:ci-only@localhost:5432/postgres
+          DD_API_KEY: ${{ secrets.DD_API_KEY }}
+          DD_CIVISIBILITY_AGENTLESS_ENABLED: "true"
+          DD_TRACE_ANTHROPIC_ENABLED: "false"
+          DD_SITE: datadoghq.com
+          DD_SERVICE: customer-install-kit
+          DD_ENV: ci
       # RC1-644: the eval subject's free cases (isolation, metadata-only tracing
       # with planted canaries). The billed cases run from the agent-evals sweep.
       - run: uv run --group evals python -m evals --free --no-record
