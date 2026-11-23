@@ -382,7 +382,7 @@ def test_healthy_collection_includes_every_source_and_signs(workspace):
     assert e["preflight_operator"]["status"] == "unavailable"  # no report in this workspace
     env = json.loads((bundle / collect.MANIFEST).read_text())
     rec_key = json.loads((workspace / "install-record.json").read_text())["report_key"]
-    public, fp = signing.trusted_key(rec_key)
+    public, fp = signing.record_public_key(rec_key)
     m = signing.verify(env, public, fp)
     assert m["schema"] == collect.SCHEMA and m["case"] == "healthy"
     assert m["versions"]["release"] == "0.1.4" and m["versions"]["allowlist"] == 1

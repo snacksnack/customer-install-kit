@@ -184,7 +184,7 @@ def inspect(archive: Path, expect_fingerprint: str | None = None,
     if not isinstance(pub, dict) or not isinstance(envelope, dict):
         raise BundleRefused("manifest or key is not a JSON object")
     try:
-        public, fp = signing.trusted_key(pub)
+        public, fp = signing.record_public_key(pub)
         if expect_fingerprint and fp != expect_fingerprint:
             raise BundleRefused(f"signed by {fp}, not the expected {expect_fingerprint}")
         manifest = signing.verify(envelope, public, fp)

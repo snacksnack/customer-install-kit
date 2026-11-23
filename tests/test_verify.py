@@ -199,7 +199,7 @@ def _key_record(key: Ed25519PrivateKey) -> dict:
 def test_signed_payload_round_trips():
     key = Ed25519PrivateKey.generate()
     env = signing.sign({"verdict": "pass", "n": 1}, key)
-    public, fp = signing.trusted_key(_key_record(key))
+    public, fp = signing.record_public_key(_key_record(key))
     assert signing.verify(env, public, fp) == {"verdict": "pass", "n": 1}
 
 
@@ -207,7 +207,7 @@ def test_any_payload_change_is_refused():
     key = Ed25519PrivateKey.generate()
     env = signing.sign({"verdict": "fail"}, key)
     env["payload"] = env["payload"].replace("fail", "pass")
-    public, fp = signing.trusted_key(_key_record(key))
+    public, fp = signing.record_public_key(_key_record(key))
     with pytest.raises(signing.SignatureInvalid, match="modified"):
         signing.verify(env, public, fp)
 
@@ -215,7 +215,7 @@ def test_any_payload_change_is_refused():
 def test_another_installs_key_is_refused_even_with_a_valid_signature():
     signer, trusted = Ed25519PrivateKey.generate(), Ed25519PrivateKey.generate()
     env = signing.sign({"verdict": "pass"}, signer)
-    public, fp = signing.trusted_key(_key_record(trusted))
+    public, fp = signing.record_public_key(_key_record(trusted))
     with pytest.raises(signing.SignatureInvalid, match="not the trusted"):
         signing.verify(env, public, fp)
     # Re-labeling the fingerprint does not help: the signature still fails.
@@ -228,7 +228,7 @@ def test_a_record_whose_key_and_fingerprint_disagree_is_refused():
     rec_key = _key_record(Ed25519PrivateKey.generate())
     rec_key["fingerprint"] = "sha256:" + "0" * 64
     with pytest.raises(signing.SignatureInvalid, match="fingerprint"):
-        signing.trusted_key(rec_key)
+        signing.record_public_key(rec_key)
 
 
 # -- runner + CLI ----------------------------------------------------------------

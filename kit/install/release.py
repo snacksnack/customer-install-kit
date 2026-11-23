@@ -33,10 +33,10 @@ from sigstore.verify.policy import Identity
 
 # The documented trusted publisher (docs/install.md). Changing any of these
 # is a trust decision, not a refactor.
-TRUSTED_REPOSITORY = "snacksnack/esp-migration-agent"
-TRUSTED_WORKFLOW = ".github/workflows/release.yml"
-TRUSTED_ISSUER = "https://token.actions.githubusercontent.com"
-TRUSTED_IMAGE = "ghcr.io/snacksnack/esp-migration-agent"
+PINNED_REPOSITORY = "snacksnack/esp-migration-agent"
+PINNED_WORKFLOW = ".github/workflows/release.yml"
+PINNED_ISSUER = "https://token.actions.githubusercontent.com"
+PINNED_IMAGE = "ghcr.io/snacksnack/esp-migration-agent"
 MANIFEST_SCHEMA = "esp.release/1"
 
 MANIFEST = "release.json"
@@ -70,7 +70,7 @@ class Release:
 
     @property
     def image_ref(self) -> str:
-        return f"{TRUSTED_IMAGE}@{self.image_digest}"
+        return f"{PINNED_IMAGE}@{self.image_digest}"
 
     def to_json(self) -> dict:
         return {
@@ -88,7 +88,7 @@ class Release:
 
 def signer_identity(version: str) -> str:
     return (
-        f"https://github.com/{TRUSTED_REPOSITORY}/{TRUSTED_WORKFLOW}@refs/tags/v{version}"
+        f"https://github.com/{PINNED_REPOSITORY}/{PINNED_WORKFLOW}@refs/tags/v{version}"
     )
 
 
@@ -103,7 +103,7 @@ def download(version: str, dest: Path) -> Path:
     _check_version(version)
     target = dest / version
     target.mkdir(parents=True, exist_ok=True)
-    base = f"https://github.com/{TRUSTED_REPOSITORY}/releases/download/v{version}"
+    base = f"https://github.com/{PINNED_REPOSITORY}/releases/download/v{version}"
     for name in FILES:
         try:
             with urllib.request.urlopen(f"{base}/{name}", timeout=DOWNLOAD_TIMEOUT_S) as resp:
@@ -117,7 +117,7 @@ def download(version: str, dest: Path) -> Path:
 
 def _sigstore_verify(manifest: bytes, bundle_json: bytes, version: str) -> None:
     bundle = Bundle.from_json(bundle_json)
-    policy = Identity(identity=signer_identity(version), issuer=TRUSTED_ISSUER)
+    policy = Identity(identity=signer_identity(version), issuer=PINNED_ISSUER)
     Verifier.production().verify_artifact(manifest, bundle, policy)
 
 
@@ -150,9 +150,9 @@ def verify(directory: Path, version: str, check: SignatureCheck = _sigstore_veri
     expect = {
         "schema": MANIFEST_SCHEMA,
         "version": version,
-        "source.repository": TRUSTED_REPOSITORY,
+        "source.repository": PINNED_REPOSITORY,
         "source.tag": f"v{version}",
-        "image.repository": TRUSTED_IMAGE,
+        "image.repository": PINNED_IMAGE,
         "image.platform": "linux/amd64",
         "sbom.file": SBOM,
     }

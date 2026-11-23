@@ -68,7 +68,7 @@ def sign(payload: dict[str, Any], key: Ed25519PrivateKey) -> dict[str, Any]:
     }
 
 
-def trusted_key(record_key: dict[str, Any]) -> tuple[Ed25519PublicKey, str]:
+def record_public_key(record_key: dict[str, Any]) -> tuple[Ed25519PublicKey, str]:
     """The public key from an install record's `report_key`, checked against
     its own fingerprint so a hand-edited record cannot pair one with another."""
     if record_key.get("algorithm") != ALGORITHM:
