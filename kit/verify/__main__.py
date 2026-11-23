@@ -40,7 +40,7 @@ def cmd_run(args: argparse.Namespace) -> int:
 def cmd_verify_report(args: argparse.Namespace) -> int:
     record = json.loads(Path(args.record).read_text())
     try:
-        public, fp = signing.trusted_key(record.get("report_key") or {})
+        public, fp = signing.record_public_key(record.get("report_key") or {})
         payload = signing.verify(json.loads(Path(args.report).read_text()), public, fp)
     except (signing.SignatureInvalid, KeyError, ValueError) as exc:
         print(f"REFUSED: {exc}", file=sys.stderr)

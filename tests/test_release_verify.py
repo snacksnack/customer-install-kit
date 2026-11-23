@@ -16,8 +16,8 @@ def write_release(tmp_path, version="0.1.1", **overrides):
     sbom = b'{"spdxVersion": "SPDX-2.3"}'
     m = {
         "schema": rel.MANIFEST_SCHEMA, "version": version,
-        "source": {"repository": rel.TRUSTED_REPOSITORY, "tag": f"v{version}", "commit": "c" * 40},
-        "image": {"repository": rel.TRUSTED_IMAGE, "digest": DIGEST, "platform": "linux/amd64"},
+        "source": {"repository": rel.PINNED_REPOSITORY, "tag": f"v{version}", "commit": "c" * 40},
+        "image": {"repository": rel.PINNED_IMAGE, "digest": DIGEST, "platform": "linux/amd64"},
         "sbom": {"file": rel.SBOM, "format": "spdx-json",
                  "sha256": hashlib.sha256(sbom).hexdigest()},
         "db_schema": {"version": 1, "compatible_with": 1},
@@ -40,7 +40,7 @@ def trusting(manifest, bundle, version):
 
 def test_intact_release_verifies_and_pins_the_digest(tmp_path):
     r = rel.verify(write_release(tmp_path), "0.1.1", check=trusting)
-    assert r.image_ref == f"{rel.TRUSTED_IMAGE}@{DIGEST}"
+    assert r.image_ref == f"{rel.PINNED_IMAGE}@{DIGEST}"
     assert (r.schema_version, r.schema_compatible_with) == (1, 1)
 
 
